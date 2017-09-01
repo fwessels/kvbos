@@ -14,6 +14,7 @@ const (
 	KeyBlockShift   = 8
 	KeyBlockSize    = 1 << KeyBlockShift
 	KeyBlockMask    = KeyBlockSize - 1
+	MaxKeyBlock     = (0xffffffffffffffff >> KeyBlockShift)
 	KeyAlign        = 8
 )
 
@@ -50,15 +51,15 @@ func (kvb *KVBos) Put(key []byte, value []byte) {
 
 	// Copy key header first (has a deterministic size,
 	// so we can iterate manually 'downwards' in memory if need be)
-	copy(KeyBlocks[0][(KeyPointer&KeyBlockMask)-uint64(KeyHeaderSize-1):], kh[:])
+	copy(KeyBlocks[getKeyBlockIndex(KeyPointer)][(KeyPointer&KeyBlockMask)-uint64(KeyHeaderSize-1):], kh[:])
 
 	// Copy key itself
 	keyAlignedSize := kh.KeyAlignedSize()
-	copy(KeyBlocks[0][(KeyPointer&KeyBlockMask)-uint64(KeyHeaderSize+keyAlignedSize-1):], key[:])
+	copy(KeyBlocks[getKeyBlockIndex(KeyPointer)][(KeyPointer&KeyBlockMask)-uint64(KeyHeaderSize+keyAlignedSize-1):], key[:])
 
 	KeyPointer -= KeyHeaderSize + uint64(keyAlignedSize)
 
-	kbh := newKeyBlockHeader(KeyBlocks[0][:])
+	kbh := newKeyBlockHeader(KeyBlocks[getKeyBlockIndex(KeyPointer)][:])
 	kbh.AddSortedPointer(KeyPointer + 1 + keyAlignedSize)
 }
 

@@ -60,6 +60,10 @@ func (kh KeyHeader) SetKeySize(ks uint32) { binary.LittleEndian.PutUint32(kh[12:
 
 type KeyBlockHeader []byte
 
+func getKeyBlockIndex(p uint64) uint64 {
+	return uint64(len(KeyBlocks)-1) - (MaxKeyBlock - (p >> KeyBlockShift))
+}
+
 func newKeyBlockHeader(b []byte) KeyBlockHeader { return KeyBlockHeader(b) }
 
 func (kbh KeyBlockHeader) Get(key []byte) []byte {
@@ -104,20 +108,20 @@ func (kbh KeyBlockHeader) AddSortedPointer(keyPointer uint64) {
 }
 
 func Compare(a, b uint64) int {
-	akh := newKeyHeader(KeyBlocks[0][a&KeyBlockMask:], KeyHeaderSize)
-	bkh := newKeyHeader(KeyBlocks[0][b&KeyBlockMask:], KeyHeaderSize)
+	akh := newKeyHeader(KeyBlocks[getKeyBlockIndex(a)][a&KeyBlockMask:], KeyHeaderSize)
+	bkh := newKeyHeader(KeyBlocks[getKeyBlockIndex(b)][b&KeyBlockMask:], KeyHeaderSize)
 
 	pKeyDataA := (a & KeyBlockMask) - akh.KeyAlignedSize()
 	pKeyDataB := (b & KeyBlockMask) - bkh.KeyAlignedSize()
 
-	return bytes.Compare(KeyBlocks[0][pKeyDataA:pKeyDataA+uint64(akh.KeySize())], KeyBlocks[0][pKeyDataB:pKeyDataB+uint64(bkh.KeySize())])
+	return bytes.Compare(KeyBlocks[getKeyBlockIndex(a)][pKeyDataA:pKeyDataA+uint64(akh.KeySize())], KeyBlocks[getKeyBlockIndex(b)][pKeyDataB:pKeyDataB+uint64(bkh.KeySize())])
 }
 
 func CompareKey(a uint64, key []byte) int {
-	akh := newKeyHeader(KeyBlocks[0][a&KeyBlockMask:], KeyHeaderSize)
+	akh := newKeyHeader(KeyBlocks[getKeyBlockIndex(a)][a&KeyBlockMask:], KeyHeaderSize)
 	pKeyDataA := (a & KeyBlockMask) - akh.KeyAlignedSize()
 
-	return bytes.Compare(KeyBlocks[0][pKeyDataA:pKeyDataA+uint64(akh.KeySize())], key)
+	return bytes.Compare(KeyBlocks[getKeyBlockIndex(a)][pKeyDataA:pKeyDataA+uint64(akh.KeySize())], key)
 }
 
 func (kbh KeyBlockHeader) ScanFromBack(key []byte) []byte {
