@@ -102,11 +102,11 @@ func (kbh KeyBlockHeader) AddSortedPointer(keyPointer uint64) {
 }
 
 func Compare(a, b uint64) int {
-	akh := newKeyHeader(KeyBlocks[0][a:], KeyHeaderSize)
-	bkh := newKeyHeader(KeyBlocks[0][b:], KeyHeaderSize)
+	akh := newKeyHeader(KeyBlocks[0][a&KeyBlockMask:], KeyHeaderSize)
+	bkh := newKeyHeader(KeyBlocks[0][b&KeyBlockMask:], KeyHeaderSize)
 
-	pKeyDataA := a-akh.KeyAlignedSize()
-	pKeyDataB := b-bkh.KeyAlignedSize()
+	pKeyDataA := (a&KeyBlockMask)-akh.KeyAlignedSize()
+	pKeyDataB := (b&KeyBlockMask)-bkh.KeyAlignedSize()
 
 	return bytes.Compare(KeyBlocks[0][pKeyDataA:pKeyDataA+uint64(akh.KeySize())], KeyBlocks[0][pKeyDataB:pKeyDataB+uint64(bkh.KeySize())])
 }

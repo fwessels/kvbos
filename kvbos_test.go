@@ -2,7 +2,7 @@ package kvbos
 
 import (
 	"testing"
-	"fmt"
+	_ "fmt"
 )
 
 func TestKVBos(t *testing.T) {
@@ -16,7 +16,7 @@ func TestKVBos(t *testing.T) {
 	kvb.Put([]byte("car-4"), []byte("ferrari"))
 	kvb.Put([]byte("car-5"), []byte("mclaren"))
 
-	fmt.Println(string(kvb.Get([]byte("car-1"))))
+	//fmt.Println(string(kvb.Get([]byte("car-1"))))
 
 	Snapshot("test")
 }
