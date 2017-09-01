@@ -4,6 +4,21 @@ import (
 	"encoding/binary"
 )
 
+// TODO: Add size of block
+//
+
+// TODO: Add version number??
+
+//type KeyBlock struct {
+//	BlockSize      uint64
+//  Entries        uint32 /* number of keys & pointers in this block */
+//  prevBlock      uint64
+//  nextBlock      uint64
+//	SortedPointers []uint64
+//
+//	Keys           []Key /* stored from the top down */
+//}
+
 //type Key struct {
 //	valuePointer uint64
 //	valueSize	 uint32
@@ -11,7 +26,8 @@ import (
 //	key		     []byte
 //}
 
-
+// Try to read it again
+//
 const KeyHeaderSize = 8 + 4 + 4
 
 type KeyHeader []byte
