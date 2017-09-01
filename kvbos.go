@@ -1,7 +1,6 @@
 package kvbos
 
-import (
-)
+import ()
 
 type Value struct {
 	value []byte
@@ -11,10 +10,12 @@ type KVBos struct {
 }
 
 const (
-	ValueBlockSize = 256
-	KeyBlockSize = 256
-	KeyBlockMask = KeyBlockSize-1
-	KeyAlign = 8
+	ValueBlockShift = 5
+	ValueBlockSize  = 1 << ValueBlockShift
+	ValueBlockMask  = ValueBlockSize - 1
+	KeyBlockSize    = 256
+	KeyBlockMask    = KeyBlockSize - 1
+	KeyAlign        = 8
 )
 
 type ValueBlock [ValueBlockSize]byte
@@ -32,9 +33,14 @@ func (kvb *KVBos) Put(key []byte, value []byte) {
 	valuePointer := ValuePointer
 	valueSize := uint32(len(value))
 	keySize := uint32(len(key))
-	copy(ValueBlocks[0][valuePointer:], value[:])
+	if valueSize >= ValueBlockSize {
+		panic("Attempting to store item larger than value block size")
+	} else if (valuePointer&ValueBlockMask)+uint64(valueSize) >= ValueBlockSize {
+		valuePointer = ((valuePointer >> ValueBlockShift) + 1) << ValueBlockShift
+	}
+	copy(ValueBlocks[valuePointer>>ValueBlockShift][valuePointer&ValueBlockMask:], value[:])
 
-	ValuePointer += uint64(valueSize)
+	ValuePointer = valuePointer + uint64(valueSize)
 
 	kh := newKeyHeader(make([]byte, KeyHeaderSize), KeyHeaderSize)
 	kh.SetValuePointer(valuePointer)
