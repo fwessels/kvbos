@@ -11,7 +11,7 @@ const (
 	ValueBlockShift = 5
 	ValueBlockSize  = 1 << ValueBlockShift
 	ValueBlockMask  = ValueBlockSize - 1
-	KeyBlockShift   = 8
+	KeyBlockShift   = 7
 	KeyBlockSize    = 1 << KeyBlockShift
 	KeyBlockMask    = KeyBlockSize - 1
 	MaxKeyBlock     = (0xffffffffffffffff >> KeyBlockShift)
@@ -49,6 +49,12 @@ func (kvb *KVBos) Put(key []byte, value []byte) {
 	kh.SetValueSize(valueSize)
 	kh.SetKeySize(keySize)
 
+	//fmt.Printf("%016x\n", KeyPointer)
+	if KeyPointer == 0xffffffffffffffcf-0x18 {
+		//panic("abort")
+		KeyPointer = 0xffffffffffffffff-KeyBlockSize
+	}
+
 	// Copy key header first (has a deterministic size,
 	// so we can iterate manually 'downwards' in memory if need be)
 	copy(KeyBlocks[getKeyBlockIndex(KeyPointer)][(KeyPointer&KeyBlockMask)-uint64(KeyHeaderSize-1):], kh[:])
@@ -63,8 +69,8 @@ func (kvb *KVBos) Put(key []byte, value []byte) {
 	kbh.AddSortedPointer(KeyPointer + 1 + keyAlignedSize)
 }
 
-func (kvb *KVBos) Get(key []byte) []byte {
-
-	kbh := newKeyBlockHeader(KeyBlocks[0][:])
-	return kbh.Get(key)
-}
+//func (kvb *KVBos) Get(key []byte) []byte {
+//
+//	kbh := newKeyBlockHeader(KeyBlocks[0][:])
+//	return kbh.Get(key)
+//}
