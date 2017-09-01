@@ -14,4 +14,6 @@ func TestKVBos(t *testing.T) {
 	kvb.Put([]byte("car-2"), []byte("audi"))
 
 	fmt.Println(string(kvb.Get([]byte("car-1"))))
+
+	Snapshot()
 }

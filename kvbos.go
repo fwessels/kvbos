@@ -1,7 +1,6 @@
 package kvbos
 
 import (
-	"fmt"
 )
 
 type Value struct {
@@ -53,7 +52,6 @@ func (kvb *KVBos) Put(key []byte, value []byte) {
 
 	kbh := newKeyBlockHeader(KeyBlocks[0][:])
 	kbh.AddSortedPointer(KeyPointer + 1 + keyAlignedSize)
-	fmt.Println(KeyBlocks[0])
 }
 
 func (kvb *KVBos) Get(key []byte) []byte {
