@@ -64,6 +64,8 @@ func getKeyBlockIndex(p uint64) uint64 {
 	return uint64(len(KeyBlocks)-1) - (MaxKeyBlock - (p >> KeyBlockShift))
 }
 
+const KeyBlockFixedHeaderSize = 8
+
 func newKeyBlockHeader(b []byte) KeyBlockHeader { return KeyBlockHeader(b) }
 
 func (kbh KeyBlockHeader) Get(key []byte) []byte {
@@ -71,7 +73,7 @@ func (kbh KeyBlockHeader) Get(key []byte) []byte {
 	entries := kbh.Entries()
 	// TODO: Do binary search
 	for e := uint32(0); e < entries; e++ {
-		pItem := binary.LittleEndian.Uint64(kbh[(e+1)*8:])
+		pItem := binary.LittleEndian.Uint64(kbh[KeyBlockFixedHeaderSize+e*8:])
 		cmp := CompareKey(pItem, key)
 		if cmp == 0 { // found
 			pItemHdr := newKeyHeader(KeyBlocks[0][pItem&KeyBlockMask:], KeyHeaderSize)
@@ -93,7 +95,7 @@ func (kbh KeyBlockHeader) AddSortedPointer(keyPointer uint64) {
 	entries := kbh.Entries()
 	// TODO: Do binary search
 	for e := uint32(0); e < entries; e++ {
-		cmp := Compare(binary.LittleEndian.Uint64(kbh[(e+1)*8:]), keyPointer)
+		cmp := Compare(binary.LittleEndian.Uint64(kbh[KeyBlockFixedHeaderSize+e*8:]), keyPointer)
 		if cmp == 1 { // insert item before
 			panic("Insert item before")
 		} else if cmp == 0 { // same item
@@ -102,7 +104,7 @@ func (kbh KeyBlockHeader) AddSortedPointer(keyPointer uint64) {
 		}
 	}
 	// insert item at the end
-	binary.LittleEndian.PutUint64(kbh[(entries+1)*8:], keyPointer)
+	binary.LittleEndian.PutUint64(kbh[KeyBlockFixedHeaderSize+entries*8:], keyPointer)
 
 	binary.LittleEndian.PutUint32(kbh[0:], entries+1)
 }

@@ -1,5 +1,7 @@
 package kvbos
 
+import "fmt"
+
 type Value struct {
 	value []byte
 }
@@ -49,10 +51,12 @@ func (kvb *KVBos) Put(key []byte, value []byte) {
 	kh.SetValueSize(valueSize)
 	kh.SetKeySize(keySize)
 
-	//fmt.Printf("%016x\n", KeyPointer)
-	if KeyPointer == 0xffffffffffffffcf-0x18 {
-		//panic("abort")
-		KeyPointer = 0xffffffffffffffff-KeyBlockSize
+	// Compute the boundaries from the beginning and end of the key block
+	lowWaterMark := uint64(KeyBlockFixedHeaderSize + newKeyBlockHeader(KeyBlocks[getKeyBlockIndex(KeyPointer)][:]).Entries()*8)
+	highWaterMark := KeyPointer&KeyBlockMask + 1
+	if KeyHeaderSize+kh.KeyAlignedSize()+8 > highWaterMark-lowWaterMark {
+		// Not enough space left to store this key, so advance to the next key block
+		KeyPointer = (((KeyPointer >> KeyBlockShift) - 1) << KeyBlockShift) + KeyBlockMask
 	}
 
 	// Copy key header first (has a deterministic size,
