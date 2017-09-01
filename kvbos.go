@@ -1,7 +1,5 @@
 package kvbos
 
-import "fmt"
-
 type Value struct {
 	value []byte
 }
