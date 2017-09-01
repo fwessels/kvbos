@@ -120,7 +120,7 @@ func CompareKey(a uint64, key []byte) int {
 
 func (kbh KeyBlockHeader) ScanFromBack(key []byte) []byte {
 
-	keyPointer := uint64(0x7f)
+	keyPointer := uint64(KeyBlockSize-1)
 
 	for i := 0; i < 3; i++ {
 		pKeyHdr := keyPointer-(KeyHeaderSize-1)

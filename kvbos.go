@@ -11,8 +11,8 @@ type KVBos struct {
 }
 
 const (
-	ValueBlockSize = 128
-	KeyBlockSize = 128
+	ValueBlockSize = 256
+	KeyBlockSize = 256
 	KeyAlign = 8
 )
 
@@ -23,7 +23,7 @@ var ValueBlocks [10]ValueBlock
 var ValuePointer = uint64(0x0000000000000000)
 
 var KeyBlocks [10]KeyBlock
-var KeyPointer = uint64(0x7f)
+var KeyPointer = uint64(KeyBlockSize-1)
 
 func (kvb *KVBos) Put(key []byte, value []byte) {
 
