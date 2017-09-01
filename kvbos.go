@@ -2,7 +2,6 @@ package kvbos
 
 import (
 	"fmt"
-	"bytes"
 )
 
 type Value struct {
@@ -53,29 +52,12 @@ func (kvb *KVBos) Put(key []byte, value []byte) {
 	KeyPointer -= KeyHeaderSize + uint64(keyAlignedSize)
 
 	kbh := newKeyBlockHeader(KeyBlocks[0][:])
-	fmt.Println(kbh.Entries())
 	kbh.AddSortedPointer(KeyPointer + 1 + keyAlignedSize)
+	fmt.Println(KeyBlocks[0])
 }
 
 func (kvb *KVBos) Get(key []byte) []byte {
 
-	keyPointer := uint64(0x7f)
-
-	for i := 0; i < 3; i++ {
-		pKeyHdr := keyPointer-(KeyHeaderSize-1)
-		kh := newKeyHeader(KeyBlocks[0][pKeyHdr:], KeyHeaderSize)
-
-		pKeyData := pKeyHdr-kh.KeyAlignedSize()
-		if bytes.Compare(/*k*/KeyBlocks[0][pKeyData:pKeyData+uint64(kh.KeySize())], key) == 0 {
-			fmt.Println("kh-e-y   f-o-u-n-d =", string(KeyBlocks[0][pKeyData:pKeyData+uint64(kh.KeySize())]))
-
-			v := make([]byte, kh.ValueSize())
-			copy(v, ValueBlocks[0][kh.ValuePointer():kh.ValuePointer()+uint64(kh.ValueSize())])
-			return v
-		}
-
-		keyPointer -= KeyHeaderSize + uint64(kh.KeyAlignedSize())
-	}
-
-	return []byte{}
+	kbh := newKeyBlockHeader(KeyBlocks[0][:])
+	return kbh.Get(key)
 }

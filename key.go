@@ -2,7 +2,8 @@ package kvbos
 
 import (
 	"encoding/binary"
-	_ "bytes"
+	"bytes"
+	"fmt"
 )
 
 // TODO: Add size of block
@@ -59,22 +60,83 @@ type KeyBlockHeader []byte
 
 func newKeyBlockHeader(b []byte) KeyBlockHeader { return KeyBlockHeader(b) }
 
+func (kbh KeyBlockHeader) Get(key []byte) []byte {
+
+	entries := kbh.Entries()
+	// TODO: Do binary search
+	for e := uint32(0); e < entries; e++ {
+		pItem := binary.LittleEndian.Uint64(kbh[(e+1)*8:])
+		cmp := CompareKey(pItem, key)
+		if cmp == 0 { // found
+			pItemHdr := newKeyHeader(KeyBlocks[0][pItem:], KeyHeaderSize)
+
+			v := make([]byte, pItemHdr.ValueSize())
+			copy(v, ValueBlocks[0][pItemHdr.ValuePointer():pItemHdr.ValuePointer()+uint64(pItemHdr.ValueSize())])
+			return v
+		}
+	}
+
+	return []byte{}
+}
+
 func (kbh KeyBlockHeader) Entries() uint32 { return uint32(binary.LittleEndian.Uint32(kbh[0:])) }
 
 func (kbh KeyBlockHeader) AddSortedPointer(keyPointer uint64) {
 
 	entries := kbh.Entries()
-	if entries == 0 {
-		binary.LittleEndian.PutUint64(kbh[8:], keyPointer)
-	} else {
-		//cmp = Compare(binary.LittleEndian.Uint64(kbh[8:], keyPointer)
+	// TODO: Do binary search
+	for e := uint32(0); e < entries; e++ {
+		cmp := Compare(binary.LittleEndian.Uint64(kbh[(e+1)*8:]), keyPointer)
+		if cmp == 1 { // insert item before
+			panic("Insert item before")
+		} else if cmp == 0 { // same item
+			panic("Same item")
+			return
+		}
+		fmt.Println(cmp)
 	}
+	// insert item at the end
+	binary.LittleEndian.PutUint64(kbh[(entries+1)*8:], keyPointer)
 
 	binary.LittleEndian.PutUint32(kbh[0:], entries + 1)
 }
 
-//func Compare(a, b uint64) int {
-//	akh := newKeyHeader(KeyBlocks[0][a:], KeyHeaderSize)
-//	bkh := newKeyHeader(KeyBlocks[0][b:], KeyHeaderSize)
-//	return bytes.Compare()
-//}
+func Compare(a, b uint64) int {
+	akh := newKeyHeader(KeyBlocks[0][a:], KeyHeaderSize)
+	bkh := newKeyHeader(KeyBlocks[0][b:], KeyHeaderSize)
+
+	pKeyDataA := a-akh.KeyAlignedSize()
+	pKeyDataB := b-bkh.KeyAlignedSize()
+
+	return bytes.Compare(KeyBlocks[0][pKeyDataA:pKeyDataA+uint64(akh.KeySize())], KeyBlocks[0][pKeyDataB:pKeyDataB+uint64(bkh.KeySize())])
+}
+
+func CompareKey(a uint64, key []byte) int {
+	akh := newKeyHeader(KeyBlocks[0][a:], KeyHeaderSize)
+	pKeyDataA := a-akh.KeyAlignedSize()
+
+	return bytes.Compare(KeyBlocks[0][pKeyDataA:pKeyDataA+uint64(akh.KeySize())], key)
+}
+
+func (kbh KeyBlockHeader) ScanFromBack(key []byte) []byte {
+
+	keyPointer := uint64(0x7f)
+
+	for i := 0; i < 3; i++ {
+		pKeyHdr := keyPointer-(KeyHeaderSize-1)
+		kh := newKeyHeader(KeyBlocks[0][pKeyHdr:], KeyHeaderSize)
+
+		pKeyData := pKeyHdr-kh.KeyAlignedSize()
+		if bytes.Compare(/*k*/KeyBlocks[0][pKeyData:pKeyData+uint64(kh.KeySize())], key) == 0 {
+			fmt.Println("kh-e-y   f-o-u-n-d =", string(KeyBlocks[0][pKeyData:pKeyData+uint64(kh.KeySize())]))
+
+			v := make([]byte, kh.ValueSize())
+			copy(v, ValueBlocks[0][kh.ValuePointer():kh.ValuePointer()+uint64(kh.ValueSize())])
+			return v
+		}
+
+		keyPointer -= KeyHeaderSize + uint64(kh.KeyAlignedSize())
+	}
+
+	return []byte{}
+}
