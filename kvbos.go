@@ -74,7 +74,7 @@ func (kvb *KVBos) Put(key []byte, value []byte) {
 func (kvb *KVBos) Get(key []byte) []byte {
 
 	for kp := KeyPointer >> KeyBlockShift; kp <= MaxKeyBlock; kp++ {
-		kbh := newKeyBlockHeader(KeyBlocks[getKeyBlockIndex(kp << KeyBlockShift)][:])
+		kbh := newKeyBlockHeader(KeyBlocks[getKeyBlockIndex(kp<<KeyBlockShift)][:])
 		val, found := kbh.Get(key)
 		if found {
 			return val
