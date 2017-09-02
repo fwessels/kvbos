@@ -68,7 +68,7 @@ const KeyBlockFixedHeaderSize = 8
 
 func newKeyBlockHeader(b []byte) KeyBlockHeader { return KeyBlockHeader(b) }
 
-func (kbh KeyBlockHeader) Get(key []byte) []byte {
+func (kbh KeyBlockHeader) Get(key []byte) ([]byte, bool) {
 
 	entries := kbh.Entries()
 	// TODO: Do binary search
@@ -76,16 +76,16 @@ func (kbh KeyBlockHeader) Get(key []byte) []byte {
 		pItem := binary.LittleEndian.Uint64(kbh[KeyBlockFixedHeaderSize+e*8:])
 		cmp := CompareKey(pItem, key)
 		if cmp == 0 { // found
-			pItemHdr := newKeyHeader(KeyBlocks[0][pItem&KeyBlockMask:], KeyHeaderSize)
+			pItemHdr := newKeyHeader(KeyBlocks[getKeyBlockIndex(pItem)][pItem&KeyBlockMask:], KeyHeaderSize)
 
 			v := make([]byte, pItemHdr.ValueSize())
 			vp := pItemHdr.ValuePointer()
 			copy(v, ValueBlocks[vp>>ValueBlockShift][vp&ValueBlockMask:(vp&ValueBlockMask)+uint64(pItemHdr.ValueSize())])
-			return v
+			return v, true
 		}
 	}
 
-	return []byte{}
+	return []byte{}, false
 }
 
 func (kbh KeyBlockHeader) Entries() uint32 { return uint32(binary.LittleEndian.Uint32(kbh[0:])) }

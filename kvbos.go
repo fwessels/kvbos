@@ -71,8 +71,14 @@ func (kvb *KVBos) Put(key []byte, value []byte) {
 	kbh.AddSortedPointer(KeyPointer + 1 + keyAlignedSize)
 }
 
-//func (kvb *KVBos) Get(key []byte) []byte {
-//
-//	kbh := newKeyBlockHeader(KeyBlocks[0][:])
-//	return kbh.Get(key)
-//}
+func (kvb *KVBos) Get(key []byte) []byte {
+
+	for kp := KeyPointer >> KeyBlockShift; kp <= MaxKeyBlock; kp++ {
+		kbh := newKeyBlockHeader(KeyBlocks[getKeyBlockIndex(kp << KeyBlockShift)][:])
+		val, found := kbh.Get(key)
+		if found {
+			return val
+		}
+	}
+	return []byte{}
+}
