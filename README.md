@@ -64,12 +64,12 @@ In order to better understand where kvbos stands, here is a comparison to redis 
 ## Block storage
 
 ```
-128 Sep  1 19:00 test-key-0xfffffffffffffe80
-128 Sep  1 19:00 test-key-0xffffffffffffff00
-128 Sep  1 19:00 test-key-0xffffffffffffff80
  32 Sep  1 19:00 test-val-0x0000000000000000
  32 Sep  1 19:00 test-val-0x0000000000000020
  32 Sep  1 19:00 test-val-0x0000000000000040
+128 Sep  1 19:00 test-key-0xfffffffffffffe80
+128 Sep  1 19:00 test-key-0xffffffffffffff00
+128 Sep  1 19:00 test-key-0xffffffffffffff80
 ```
 
 ## Dump value blocks 
