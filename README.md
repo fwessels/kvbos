@@ -155,4 +155,5 @@ struct {
 ## Limitations
 
 - Values larger than the Value Block size cannot be stored
-- 
+- Key size is limited to 16-bits
+- Value size is limited to 32-bits

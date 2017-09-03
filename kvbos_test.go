@@ -18,8 +18,14 @@ func TestKVBos(t *testing.T) {
 	kvb.Put([]byte("car-6"), []byte("mercedes"))
 	kvb.Put([]byte("car-7"), []byte("jaguar"))
 
+	// empty keys have value size = 0 and current value of value pointer
+	kvb.Put([]byte("car-8"), []byte(""))
+	kvb.Put([]byte("car-9"), []byte(""))
+	// both have same value pointer
+
 	fmt.Println(string(kvb.Get([]byte("car-1"))))
 	fmt.Println(string(kvb.Get([]byte("car-4"))))
+	fmt.Println(string(kvb.Get([]byte("car-8"))))
 
 	Snapshot("test")
 }

@@ -32,7 +32,7 @@ func (kvb *KVBos) Put(key []byte, value []byte) {
 	// Copy value into block
 	valuePointer := ValuePointer
 	valueSize := uint32(len(value))
-	keySize := uint32(len(key))
+	keySize := uint16(len(key))
 	if valueSize >= ValueBlockSize {
 		// TODO: Could "overflow" value into a new block (provided it is smaller than uint32)
 		// and would require multiple blocks to read (or multiple HTTP Range GETs)

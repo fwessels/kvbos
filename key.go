@@ -40,17 +40,21 @@ func (kh KeyHeader) ValuePointer() uint64 { return uint64(binary.LittleEndian.Ui
 
 func (kh KeyHeader) ValueSize() uint32 { return uint32(binary.LittleEndian.Uint32(kh[8:])) }
 
-func (kh KeyHeader) KeySize() uint32 { return uint32(binary.LittleEndian.Uint32(kh[12:])) }
+func (kh KeyHeader) KeySize() uint16 { return uint16(binary.LittleEndian.Uint32(kh[12:])) }
+
+func (kh KeyHeader) Crc16() uint16 { return uint16(binary.LittleEndian.Uint32(kh[14:])) }
 
 func (kh KeyHeader) KeyAlignedSize() uint64 {
-	return uint64((kh.KeySize() + KeyAlign - 1) & ^uint32(KeyAlign-1))
+	return uint64((kh.KeySize() + KeyAlign - 1) & ^uint16(KeyAlign-1))
 }
 
 func (kh KeyHeader) SetValuePointer(vp uint64) { binary.LittleEndian.PutUint64(kh[0:], vp) }
 
-func (kh KeyHeader) SetValueSize(vs uint32) { binary.LittleEndian.PutUint32(kh[8:], vs) }
+func (kh KeyHeader) SetValueSize(size uint32) { binary.LittleEndian.PutUint32(kh[8:], size) }
 
-func (kh KeyHeader) SetKeySize(ks uint32) { binary.LittleEndian.PutUint32(kh[12:], ks) }
+func (kh KeyHeader) SetKeySize(size uint16) { binary.LittleEndian.PutUint16(kh[12:], size) }
+
+func (kh KeyHeader) SetCrc16(crc uint16) { binary.LittleEndian.PutUint16(kh[14:], crc) }
 
 //type KeyBlockHeader struct {
 //	entries uint32
