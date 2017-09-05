@@ -1,11 +1,22 @@
 
 # KVBOS
 
-kvbos is a **K**ey **V**alue **B**acked (on) **O**bject **S**torage.
+kvbos is a **K**ey **V**alue **B**acked (by) **O**bject **S**torage.
 
 It is a Key Value store relying on storing key/value pairs in NVRAM that is backed by Object Storage.
 
 It is meant for very large datasets. By taking full advantage of emerging NVRAM trends, servers with up to 150 TB of total space can be created today. This will grow over the next one to two years to PB (Petabyte) scale size.
+
+## Key ideas
+
+- Separate keys and values (store in separate objects)
+- Use persistent addresses via 64-bit addresses
+- Make snapshotting cheap and fast
+- Use same format for in-memory and object storage (meaning 'conversionless' loads & saves)
+- Do not optimize for size, eg avoid varints (object storage is cheap)
+- Keys are stored in an immutable append-only fashion
+- High performance and fully multi-threaded
+- Simplictly in use, minimal config (ideally none)
 
 ## Persistent Memory
 
@@ -151,9 +162,15 @@ struct {
 }
 ```
 
+## Ideas
+
+Split between
+- kvbos-engine (core embeddable engine)
+- kvbos (Redis like interface)
 
 ## Limitations
 
-- Values larger than the Value Block size cannot be stored
-- Key size is limited to 16-bits
 - Value size is limited to 32-bits
+- Key size is limited to 16-bits
+- 
+- Values larger than the Value Block size cannot be stored

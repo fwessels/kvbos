@@ -1,5 +1,7 @@
 package kvbos
 
+import "sync/atomic"
+
 type Value struct {
 	value []byte
 }
@@ -27,6 +29,7 @@ var ValuePointer = uint64(0x0000000000000010) // Skip first 0x10 bytes (prevent 
 var KeyBlocks [10]KeyBlock
 var KeyPointer = uint64(0xffffffffffffffff)
 
+// Put
 func (kvb *KVBos) Put(key []byte, value []byte) {
 
 	// Copy value into block
@@ -48,6 +51,7 @@ func (kvb *KVBos) Put(key []byte, value []byte) {
 	kh.SetValuePointer(valuePointer)
 	kh.SetValueSize(valueSize)
 	kh.SetKeySize(keySize)
+	kh.SetCrc16(0x1234)
 
 	// Compute the boundaries from the beginning and end of the key block
 	lowWaterMark := uint64(KeyBlockFixedHeaderSize + newKeyBlockHeader(KeyBlocks[getKeyBlockIndex(KeyPointer)][:]).Entries()*8)
@@ -71,9 +75,12 @@ func (kvb *KVBos) Put(key []byte, value []byte) {
 	kbh.AddSortedPointer(KeyPointer + 1 + keyAlignedSize)
 }
 
+// Get
 func (kvb *KVBos) Get(key []byte) []byte {
 
-	for kp := KeyPointer >> KeyBlockShift; kp <= MaxKeyBlock; kp++ {
+	kpReadOnly := atomic.LoadUint64(&KeyPointer)
+
+	for kp := kpReadOnly >> KeyBlockShift; kp <= MaxKeyBlock; kp++ {
 		kbh := newKeyBlockHeader(KeyBlocks[getKeyBlockIndex(kp<<KeyBlockShift)][:])
 		val, found := kbh.Get(key)
 		if found {
@@ -81,4 +88,9 @@ func (kvb *KVBos) Get(key []byte) []byte {
 		}
 	}
 	return []byte{}
+}
+
+// Delete
+func (kvb *KVBos) Delete(key []byte) {
+	// Add key with value pointer = NULL/0x0 and value size = 0
 }

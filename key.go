@@ -12,21 +12,20 @@ import (
 // TODO: Add version number??
 
 //type KeyBlock struct {
-//	BlockSize      uint64
-//  Entries        uint32 /* number of keys & pointers in this block */
-//  prevBlock      uint64
-//  nextBlock      uint64
+//  Entries        uint64 /* number of keys & pointers in this block */
 //	SortedPointers []uint64
 //
 //	Keys           []Key /* stored from the top down */
 //}
 
 //type Key(Header) struct {
+//	key		     []byte //
 //	valuePointer uint64
 //	valueSize	 uint32
-//	keySize 	 uint32
-//	key		     []byte
+//	keySize 	 uint16
+//	crc16 	     uint16
 //}
+
 
 // TODO: Try to read it again when mismatch detected while reading merged blocks
 //
@@ -57,8 +56,7 @@ func (kh KeyHeader) SetKeySize(size uint16) { binary.LittleEndian.PutUint16(kh[1
 func (kh KeyHeader) SetCrc16(crc uint16) { binary.LittleEndian.PutUint16(kh[14:], crc) }
 
 //type KeyBlockHeader struct {
-//	entries uint32
-//	unused uint32
+//	entries uint64
 //  sortedKeyPointers []uint64
 //}
 

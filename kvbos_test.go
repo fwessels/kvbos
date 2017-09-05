@@ -3,6 +3,9 @@ package kvbos
 import (
 	"fmt"
 	"testing"
+	"io"
+	"crypto/rand"
+	"encoding/binary"
 )
 
 func TestKVBos(t *testing.T) {
@@ -28,4 +31,28 @@ func TestKVBos(t *testing.T) {
 	fmt.Println(string(kvb.Get([]byte("car-8"))))
 
 	Snapshot("test")
+}
+
+func BenchmarkPuts(b *testing.B) {
+
+	kvb := KVBos{}
+
+	keyCounter := uint64(1)
+	key := make([]byte, 8)
+
+	const valSize = 800
+	value := make([]byte, valSize)
+	if _, err := io.ReadFull(rand.Reader, value); err != nil {
+		b.Fatalf("Failed to generate random value: %v", err)
+	}
+
+	b.SetBytes(valSize)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+
+		keyCounter++
+		binary.LittleEndian.PutUint64(key[0:], keyCounter)
+
+		kvb.Put(key, value)
+	}
 }

@@ -75,5 +75,16 @@ func CombineKeyBlocks() {
 }
 
 func CombineValueBlocks() {
-	// Concat blocks into larger one and delete old smaller blocks
+	// Concat two value blocks into larger one and delete old blocks
+}
+
+func TrimValueBlock() {
+	// Scan from end of the block as to whether value pointer is no longer used (corresponding
+	// key deleted) until first active value pointer is found.
+	// If scanned all the way to be beginning of the block, delete block altogether
+    // Range of keys scanned to be scanned is determined by address range of value block
+}
+
+func TrimKeyBlock() {
+	// If all keys are tombstoned, consider removing block completely
 }
