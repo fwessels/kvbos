@@ -1,6 +1,10 @@
 package kvbos
 
-import "sync/atomic"
+import (
+	"sync/atomic"
+	"sync"
+	_ "fmt"
+)
 
 type Value struct {
 	value []byte
@@ -10,10 +14,13 @@ type KVBos struct {
 }
 
 const (
-	ValueBlockShift = 5
+	ValueBlockShift = 26
+	KeyBlockShift   = 19
+)
+
+const (
 	ValueBlockSize  = 1 << ValueBlockShift
 	ValueBlockMask  = ValueBlockSize - 1
-	KeyBlockShift   = 7
 	KeyBlockSize    = 1 << KeyBlockShift
 	KeyBlockMask    = KeyBlockSize - 1
 	MaxKeyBlock     = (0xffffffffffffffff >> KeyBlockShift)
@@ -23,14 +30,18 @@ const (
 type ValueBlock [ValueBlockSize]byte
 type KeyBlock [KeyBlockSize]byte
 
-var ValueBlocks [10]ValueBlock
+var ValueBlocks [25]ValueBlock
 var ValuePointer = uint64(0x0000000000000010) // Skip first 0x10 bytes (prevent 'NULL' from being a valid value pointer)
 
-var KeyBlocks [10]KeyBlock
+var KeyBlocks [160]KeyBlock
 var KeyPointer = uint64(0xffffffffffffffff)
+var KeyLock = sync.Mutex{}
 
 // Put
 func (kvb *KVBos) Put(key []byte, value []byte) {
+
+	KeyLock.Lock()
+	defer KeyLock.Unlock()
 
 	// Copy value into block
 	valuePointer := ValuePointer
