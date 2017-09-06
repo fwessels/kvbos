@@ -5,16 +5,16 @@ import (
 	"io/ioutil"
 )
 
-func Snapshot(db string) {
+func (kvb *KVBos) Snapshot(db string) {
 	// TODO: Prevent resaving same block
-	for i := uint64(0x0000000000000000); i>>ValueBlockShift <= ValuePointer>>ValueBlockShift; i += ValueBlockSize {
+	for i := uint64(0x0000000000000000); i>>ValueBlockShift <= kvb.ValuePointer>>ValueBlockShift; i += ValueBlockSize {
 		filename := fmt.Sprintf("%s-val-0x%016x", db, i)
-		ioutil.WriteFile(filename, ValueBlocks[i>>ValueBlockShift][:], 0644)
+		ioutil.WriteFile(filename, kvb.ValueBlocks[i>>ValueBlockShift][:], 0644)
 	}
 
-	for i := uint64(0xffffffffffffffff) - KeyBlockMask; i>>KeyBlockShift >= KeyPointer>>KeyBlockShift; i -= KeyBlockSize {
+	for i := uint64(0xffffffffffffffff) - KeyBlockMask; i>>KeyBlockShift >= kvb.KeyPointer>>KeyBlockShift; i -= KeyBlockSize {
 		filename := fmt.Sprintf("%s-key-0x%016x", db, i)
-		ioutil.WriteFile(filename, KeyBlocks[getKeyBlockIndex(i)][:], 0644)
+		ioutil.WriteFile(filename, kvb.KeyBlocks[kvb.getKeyBlockIndex(i)][:], 0644)
 	}
 }
 
@@ -82,7 +82,7 @@ func TrimValueBlock() {
 	// Scan from end of the block as to whether value pointer is no longer used (corresponding
 	// key deleted) until first active value pointer is found.
 	// If scanned all the way to be beginning of the block, delete block altogether
-    // Range of keys scanned to be scanned is determined by address range of value block
+	// Range of keys scanned to be scanned is determined by address range of value block
 }
 
 func TrimKeyBlock() {
