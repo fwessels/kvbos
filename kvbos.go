@@ -15,7 +15,7 @@ type KVBos struct {
 	ValueBlocks  [28]ValueBlock
 	ValuePointer uint64
 
-	KeyBlocks  [300]KeyBlock
+	KeyBlocks  [500]KeyBlock
 	KeyPointer uint64
 	KeyLock    sync.Mutex
 }
@@ -25,8 +25,9 @@ type Value struct {
 }
 
 func NewKVBos() *KVBos {
-	return &KVBos{ValuePointer: uint64(0x0000000000000010), // Skip first 0x10 bytes (prevent 'NULL' from being a valid value pointer),
-		KeyPointer: uint64(0xffffffffffffffff)} //
+	return &KVBos{
+		ValuePointer: uint64(0x0000000000000010), // Skip first 0x10 bytes (prevent 'NULL' from being a valid value pointer),
+		KeyPointer:   uint64(0xffffffffffffffff)} // Start at the end of the address range
 }
 
 const (
@@ -48,10 +49,18 @@ func (kvb *KVBos) getKeyBlockIndex(p uint64) uint64 {
 // Put
 func (kvb *KVBos) Put(key []byte, value []byte) {
 
-	kvb.KeyLock.Lock()
-	defer kvb.KeyLock.Unlock()
+	valuePointer := kvb.putAtomic(key, value)
 
-	// Copy value into block
+	// Copy value into value block
+	copy(kvb.ValueBlocks[valuePointer>>ValueBlockShift][valuePointer&ValueBlockMask:], value)
+}
+
+// putAtomic -- atomic part of Put() operation
+func (kvb *KVBos) putAtomic(key []byte, value []byte) uint64 {
+
+	kvb.KeyLock.Lock()
+
+	// Prepare value pointer
 	valuePointer := kvb.ValuePointer
 	valueSize := uint32(len(value))
 	keySize := uint16(len(key))
@@ -63,7 +72,6 @@ func (kvb *KVBos) Put(key []byte, value []byte) {
 		fmt.Println("New value block")
 		valuePointer = ((valuePointer >> ValueBlockShift) + 1) << ValueBlockShift // advance to beginning of next block
 	}
-	copy(kvb.ValueBlocks[valuePointer>>ValueBlockShift][valuePointer&ValueBlockMask:], value[:])
 
 	kvb.ValuePointer = valuePointer + uint64(valueSize)
 
@@ -93,12 +101,18 @@ func (kvb *KVBos) Put(key []byte, value []byte) {
 
 	kbh := newKeyBlockHeader(kvb.KeyBlocks[kvb.getKeyBlockIndex(kvb.KeyPointer)][:])
 	kbh.AddSortedPointer(kvb.KeyPointer+1+keyAlignedSize, kvb)
+
+	kvb.KeyLock.Unlock()
+
+	return valuePointer
 }
 
 // Get
 func (kvb *KVBos) Get(key []byte) []byte {
 
 	kpReadOnly := atomic.LoadUint64(&kvb.KeyPointer)
+
+	// Search active key block with 'linear' search (sorted pointer map may be modified by writes)
 
 	for kp := kpReadOnly >> KeyBlockShift; kp <= MaxKeyBlock; kp++ {
 		kbh := newKeyBlockHeader(kvb.KeyBlocks[kvb.getKeyBlockIndex(kp<<KeyBlockShift)][:])
