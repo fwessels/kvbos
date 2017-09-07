@@ -21,8 +21,13 @@ It is meant for very large datasets. By taking full advantage of emerging NVRAM 
 ## Performance
 
 ```
-BenchmarkPuts100b-8   	 5000000	       297 ns/op	 336.61 MB/s
-BenchmarkPuts200b-8   	 5000000	       310 ns/op	 643.47 MB/s
+BenchmarkPut100b-8   	 5000000	       297 ns/op	 336.61 MB/s
+BenchmarkPut200b-8   	 5000000	       310 ns/op	 643.47 MB/s
+```
+
+Read from 100M keys (single thread)
+```
+BenchmarkGet10B-8   	  200000	      5940 ns/op	   1.68 MB/s
 ```
 
 ```
