@@ -7,6 +7,7 @@ import (
 	"io"
 	"sync/atomic"
 	"testing"
+	"sync"
 )
 
 func TestKVBos(t *testing.T) {
@@ -40,9 +41,56 @@ func TestKVBos(t *testing.T) {
 	kvb.Snapshot("test")
 }
 
-var keyCounter = uint64(128)
+const million = 1000000
+
+func testCreate(t *testing.T, entries uint64) {
+
+	kvb, keyCounter := NewKVBos(), uint64(0)
+
+	wg := sync.WaitGroup{}
+	for gr := 0; gr < 1; gr++ {
+		wg.Add(1)
+		go func() {
+
+			key := make([]byte, 8)
+			value := make([]byte, 1)
+			if _, err := io.ReadFull(rand.Reader, value); err != nil {
+				t.Fatalf("Failed to generate random value: %v", err)
+			}
+			for {
+				cntr := atomic.AddUint64(&keyCounter, 1)
+				if cntr >= entries {
+					break
+				}
+
+				binary.BigEndian.PutUint64(key[0:], cntr) // Use big endian for sequential ordering
+
+				kvb.Put(key, value)
+			}
+			wg.Done()
+		}()
+	}
+
+	wg.Wait()
+}
+
+func TestCreate10M(t *testing.T) { testCreate(t, 10*million) }
+func TestCreate20M(t *testing.T) { testCreate(t, 20*million) }
+func TestCreate40M(t *testing.T) { testCreate(t, 40*million) }
+func TestCreate80M(t *testing.T) { testCreate(t, 80*million) }
+func TestCreate160M(t *testing.T) { testCreate(t, 160*million) }
+func TestCreate240M(t *testing.T) { testCreate(t, 240*million) }
+func TestCreate320M(t *testing.T) { testCreate(t, 320*million) }
+func TestCreate400M(t *testing.T) { testCreate(t, 400*million) }
+func TestCreate500M(t *testing.T) { testCreate(t, 500*million) }
+func TestCreate750M(t *testing.T) { testCreate(t, 750*million) }
+func TestCreate1000M(t *testing.T) { testCreate(t, 1000*million) }
 
 func benchmarkPuts(b *testing.B, valSize int64) {
+
+	keyCounter := uint64(0)
+
+	kvbBenchmark := NewKVBos()
 
 	key := make([]byte, 8)
 
@@ -55,7 +103,7 @@ func benchmarkPuts(b *testing.B, valSize int64) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 
-		cntr := atomic.AddUint64(&keyCounter, 256)
+		cntr := atomic.AddUint64(&keyCounter, 1)
 
 		binary.BigEndian.PutUint64(key[0:], cntr) // Use big endian for sequential ordering
 
@@ -65,8 +113,11 @@ func benchmarkPuts(b *testing.B, valSize int64) {
 	//kvbBenchmark.Snapshot("benchmark")
 }
 
-var kvbBenchmark = NewKVBos()
 
-func BenchmarkPuts800b(b *testing.B) {
-	benchmarkPuts(b, 200)
+func BenchmarkPuts20B(b *testing.B) { benchmarkPuts(b, 20) }
+func BenchmarkPuts100B(b *testing.B) { benchmarkPuts(b, 100) }
+func BenchmarkPuts200B(b *testing.B) { benchmarkPuts(b, 200) }
+
+func benchmarkGets(b *testing.B, valSize int64) {
+
 }

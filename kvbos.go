@@ -1,21 +1,20 @@
 package kvbos
 
 import (
-	"fmt"
 	"sync"
 	"sync/atomic"
 )
 
 const (
 	ValueBlockShift = /*8//*/ 26
-	KeyBlockShift   = /*8//*/ 19
+	KeyBlockShift   = /*8//*/ 19+1+3+1+1
 )
 
 type KVBos struct {
 	ValueBlocks  [28]ValueBlock
 	ValuePointer uint64
 
-	KeyBlocks  [500]KeyBlock
+	KeyBlocks  [1000]KeyBlock
 	KeyPointer uint64
 	KeyLock    sync.Mutex
 }
@@ -69,7 +68,7 @@ func (kvb *KVBos) putAtomic(key []byte, value []byte) uint64 {
 		// and would require multiple blocks to read (or multiple HTTP Range GETs)
 		panic("Attempting to store item larger than value block size")
 	} else if (valuePointer&ValueBlockMask)+uint64(valueSize) >= ValueBlockSize {
-		fmt.Println("New value block")
+		//fmt.Println("New value block")
 		valuePointer = ((valuePointer >> ValueBlockShift) + 1) << ValueBlockShift // advance to beginning of next block
 	}
 

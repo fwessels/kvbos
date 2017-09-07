@@ -18,6 +18,28 @@ It is meant for very large datasets. By taking full advantage of emerging NVRAM 
 - High performance and fully multi-threaded
 - Simplictly in use, minimal config (ideally none)
 
+## Performance
+
+```
+BenchmarkPuts100b-8   	 5000000	       297 ns/op	 336.61 MB/s
+BenchmarkPuts200b-8   	 5000000	       310 ns/op	 643.47 MB/s
+```
+
+```
+--- PASS: TestCreate10M (4.00s)
+--- PASS: TestCreate20M (7.71s)
+--- PASS: TestCreate40M (17.12s)
+--- PASS: TestCreate80M (31.86s)
+--- PASS: TestCreate120M (50.95s)
+--- PASS: TestCreate160M (67.49s)
+--- PASS: TestCreate240M (101.97s)
+--- PASS: TestCreate320M (137.35s)
+--- PASS: TestCreate400M (169.47s)
+--- PASS: TestCreate500M (212.75s)
+--- PASS: TestCreate750M (321.27s)
+--- PASS: TestCreate1000M (393.07s)
+```
+
 ## Persistent Memory
 
 Think of kvbos as creating a persistent memory space at a 64-bit address range scale.
