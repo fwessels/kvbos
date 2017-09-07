@@ -70,17 +70,30 @@ func newKeyBlockHeader(b []byte) KeyBlockHeader { return KeyBlockHeader(b) }
 func (kbh KeyBlockHeader) Get(key []byte, kvb *KVBos) ([]byte, bool) {
 
 	entries := kbh.Entries()
-	// TODO: Do binary search
-	for e := uint32(0); e < entries; e++ {
-		pItem := binary.LittleEndian.Uint64(kbh[KeyBlockFixedHeaderSize+e*8:])
+
+	startIndex := uint32(0)
+	endIndex := entries
+
+	// (Binary) search for position to add new pointer
+	for startIndex < endIndex {
+		pItem := binary.LittleEndian.Uint64(kbh[KeyBlockFixedHeaderSize+(startIndex+endIndex)>>1*8:])
 		cmp := kvb.CompareKey(pItem, key)
-		if cmp == 0 { // found
+		if cmp == 0 { // same item
 			pItemHdr := newKeyHeader(kvb.KeyBlocks[kvb.getKeyBlockIndex(pItem)][pItem&KeyBlockMask:], KeyHeaderSize)
 
 			v := make([]byte, pItemHdr.ValueSize())
 			vp := pItemHdr.ValuePointer()
 			copy(v, kvb.ValueBlocks[vp>>ValueBlockShift][vp&ValueBlockMask:(vp&ValueBlockMask)+uint64(pItemHdr.ValueSize())])
 			return v, true
+		}
+		center := (endIndex - startIndex) >> 1
+		if center == 0 {
+			break
+		}
+		if cmp == -1 {
+			startIndex += center
+		} else {
+			endIndex -= center
 		}
 	}
 

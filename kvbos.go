@@ -7,7 +7,7 @@ import (
 
 const (
 	ValueBlockShift = /*8//*/ 26
-	KeyBlockShift   = /*8//*/ 19+1+3+1+1
+	KeyBlockShift   = /*8//*/ 19+1+3+1+1+1+1+1+1
 )
 
 type KVBos struct {

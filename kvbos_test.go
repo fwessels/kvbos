@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"testing"
 	"sync"
+	mr "math/rand"
 )
 
 func TestKVBos(t *testing.T) {
@@ -43,7 +44,7 @@ func TestKVBos(t *testing.T) {
 
 const million = 1000000
 
-func testCreate(t *testing.T, entries uint64) {
+func testCreate(entries uint64, valSize int64) (*KVBos, uint64) {
 
 	kvb, keyCounter := NewKVBos(), uint64(0)
 
@@ -53,9 +54,9 @@ func testCreate(t *testing.T, entries uint64) {
 		go func() {
 
 			key := make([]byte, 8)
-			value := make([]byte, 1)
+			value := make([]byte, valSize)
 			if _, err := io.ReadFull(rand.Reader, value); err != nil {
-				t.Fatalf("Failed to generate random value: %v", err)
+				panic("Failed to generate random value")
 			}
 			for {
 				cntr := atomic.AddUint64(&keyCounter, 1)
@@ -72,21 +73,23 @@ func testCreate(t *testing.T, entries uint64) {
 	}
 
 	wg.Wait()
+
+	return kvb, atomic.LoadUint64(&keyCounter)
 }
 
-func TestCreate10M(t *testing.T) { testCreate(t, 10*million) }
-func TestCreate20M(t *testing.T) { testCreate(t, 20*million) }
-func TestCreate40M(t *testing.T) { testCreate(t, 40*million) }
-func TestCreate80M(t *testing.T) { testCreate(t, 80*million) }
-func TestCreate160M(t *testing.T) { testCreate(t, 160*million) }
-func TestCreate240M(t *testing.T) { testCreate(t, 240*million) }
-func TestCreate320M(t *testing.T) { testCreate(t, 320*million) }
-func TestCreate400M(t *testing.T) { testCreate(t, 400*million) }
-func TestCreate500M(t *testing.T) { testCreate(t, 500*million) }
-func TestCreate750M(t *testing.T) { testCreate(t, 750*million) }
-func TestCreate1000M(t *testing.T) { testCreate(t, 1000*million) }
+func TestCreate10M(t *testing.T) { testCreate(10*million, 1) }
+func TestCreate20M(t *testing.T) { testCreate(20*million, 1) }
+func TestCreate40M(t *testing.T) { testCreate(40*million, 1) }
+func TestCreate80M(t *testing.T) { testCreate(80*million, 1) }
+func TestCreate160M(t *testing.T) { testCreate(160*million, 1) }
+func TestCreate240M(t *testing.T) { testCreate(240*million, 1) }
+func TestCreate320M(t *testing.T) { testCreate(320*million, 1) }
+func TestCreate400M(t *testing.T) { testCreate(400*million, 1) }
+func TestCreate500M(t *testing.T) { testCreate(500*million, 1) }
+func TestCreate750M(t *testing.T) { testCreate(750*million, 1) }
+func TestCreate1000M(t *testing.T) { testCreate(1000*million, 1) }
 
-func benchmarkPuts(b *testing.B, valSize int64) {
+func benchmarkPut(b *testing.B, valSize int64) {
 
 	keyCounter := uint64(0)
 
@@ -113,11 +116,34 @@ func benchmarkPuts(b *testing.B, valSize int64) {
 	//kvbBenchmark.Snapshot("benchmark")
 }
 
+func BenchmarkPut20B(b *testing.B) { benchmarkPut(b, 20) }
+func BenchmarkPut100B(b *testing.B) { benchmarkPut(b, 100) }
+func BenchmarkPut200B(b *testing.B) { benchmarkPut(b, 200) }
 
-func BenchmarkPuts20B(b *testing.B) { benchmarkPuts(b, 20) }
-func BenchmarkPuts100B(b *testing.B) { benchmarkPuts(b, 100) }
-func BenchmarkPuts200B(b *testing.B) { benchmarkPuts(b, 200) }
+var kvbGets *KVBos
+var kvbGetsEntries uint64
 
-func benchmarkGets(b *testing.B, valSize int64) {
+func benchmarkGet(b *testing.B, valSize int64) {
 
+	if kvbGets == nil {
+		fmt.Println("Create test db ...")
+		kvbGets, kvbGetsEntries = testCreate(100*million, valSize)
+		fmt.Println("Done creating test db")
+		fmt.Println("  key blocks =", kvbGets.GetKeyBlocks())
+		fmt.Println("     entries =", kvbGetsEntries)
+	}
+
+	key := make([]byte, 8)
+
+	b.SetBytes(valSize)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+
+		cntr := mr.Int63n(int64(kvbGetsEntries))
+		binary.BigEndian.PutUint64(key[0:], uint64(cntr)) // Use big endian for sequential ordering
+
+		kvbGets.Get(key)
+	}
 }
+
+func BenchmarkGet10B(b *testing.B) { benchmarkGet(b, 10) }
