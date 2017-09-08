@@ -5,10 +5,10 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	mr "math/rand"
+	"sync"
 	"sync/atomic"
 	"testing"
-	"sync"
-	mr "math/rand"
 )
 
 func TestKVBos(t *testing.T) {
@@ -23,7 +23,7 @@ func TestKVBos(t *testing.T) {
 	kvb.Put([]byte("car-05"), []byte("audi"))
 	kvb.Put([]byte("car-06"), []byte("mercedes"))
 	kvb.Put([]byte("car-07"), []byte("jaguar"))
-	//
+
 	// empty keys have value size = 0 and current value of value pointer
 	kvb.Put([]byte("car-08"), []byte(""))
 	kvb.Put([]byte("car-09"), []byte(""))
@@ -33,6 +33,8 @@ func TestKVBos(t *testing.T) {
 	kvb.Put([]byte("car-11"), []byte("astonmartin"))
 	kvb.Put([]byte("car-12"), []byte("lamborghini"))
 	kvb.Put([]byte("car-13"), []byte("lotus"))
+
+	kvb.Put([]byte("car-14"), []byte("vauxhall"))
 
 	fmt.Println(string(kvb.Get([]byte("car-01"))))
 	fmt.Println(string(kvb.Get([]byte("car-04"))))
@@ -77,17 +79,24 @@ func testCreate(entries uint64, valSize int64) (*KVBos, uint64) {
 	return kvb, atomic.LoadUint64(&keyCounter)
 }
 
-func TestCreate10M(t *testing.T) { testCreate(10*million, 1) }
-func TestCreate20M(t *testing.T) { testCreate(20*million, 1) }
-func TestCreate40M(t *testing.T) { testCreate(40*million, 1) }
-func TestCreate80M(t *testing.T) { testCreate(80*million, 1) }
-func TestCreate160M(t *testing.T) { testCreate(160*million, 1) }
-func TestCreate240M(t *testing.T) { testCreate(240*million, 1) }
-func TestCreate320M(t *testing.T) { testCreate(320*million, 1) }
-func TestCreate400M(t *testing.T) { testCreate(400*million, 1) }
-func TestCreate500M(t *testing.T) { testCreate(500*million, 1) }
-func TestCreate750M(t *testing.T) { testCreate(750*million, 1) }
+func TestCreate10M(t *testing.T)   { testCreate(10*million, 1) }
+func TestCreate20M(t *testing.T)   { testCreate(20*million, 1) }
+func TestCreate40M(t *testing.T)   { testCreate(40*million, 1) }
+func TestCreate80M(t *testing.T)   { testCreate(80*million, 1) }
+func TestCreate160M(t *testing.T)  { testCreate(160*million, 1) }
+func TestCreate240M(t *testing.T)  { testCreate(240*million, 1) }
+func TestCreate320M(t *testing.T)  { testCreate(320*million, 1) }
+func TestCreate400M(t *testing.T)  { testCreate(400*million, 1) }
+func TestCreate500M(t *testing.T)  { testCreate(500*million, 1) }
+func TestCreate750M(t *testing.T)  { testCreate(750*million, 1) }
 func TestCreate1000M(t *testing.T) { testCreate(1000*million, 1) }
+
+func TestCombineKeyBlocks(t *testing.T) {
+
+	//CombineKeyBlocks("test", uint64(0xffffffffffffff00), (0xffffffffffffff80))
+	//CombineKeyBlocks("test", uint64(0xfffffffffffffe00), (0xffffffffffffff00))
+	CombineKeyBlocks("get-test", uint64(0xffffffff80000000), (0xffffffffc0000000))
+}
 
 func benchmarkPut(b *testing.B, valSize int64) {
 
@@ -116,7 +125,7 @@ func benchmarkPut(b *testing.B, valSize int64) {
 	//kvbBenchmark.Snapshot("benchmark")
 }
 
-func BenchmarkPut20B(b *testing.B) { benchmarkPut(b, 20) }
+func BenchmarkPut20B(b *testing.B)  { benchmarkPut(b, 20) }
 func BenchmarkPut100B(b *testing.B) { benchmarkPut(b, 100) }
 func BenchmarkPut200B(b *testing.B) { benchmarkPut(b, 200) }
 

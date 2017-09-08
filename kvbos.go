@@ -55,6 +55,9 @@ func (kvb *KVBos) Put(key []byte, value []byte) {
 }
 
 // putAtomic -- atomic part of Put() operation
+// KeyPointer and ValuePointer are always adjusted in tandem, ie
+// the lowest (=latest) KeyPointer is associated with the highest
+// (=latest) ValuePointer
 func (kvb *KVBos) putAtomic(key []byte, value []byte) uint64 {
 
 	kvb.KeyLock.Lock()

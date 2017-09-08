@@ -1,8 +1,11 @@
 package kvbos
 
 import (
+	"encoding/binary"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"os"
 )
 
 func (kvb *KVBos) Snapshot(db string) {
@@ -24,7 +27,60 @@ func Load() {
 	// consider adding CRC to KeyStruct to detect tampering/bad stores
 }
 
-func CombineKeyBlocks() {
+func CombineKeyBlocks(db string, startBlockLo, startBlockHi uint64) {
+
+	filenameLo := fmt.Sprintf("%s-key-0x%016x", db, startBlockLo)
+	filenameHi := fmt.Sprintf("%s-key-0x%016x", db, startBlockHi)
+
+	//var err error
+	keyBlockLo, _ := ioutil.ReadFile(filenameLo)
+	keyBlockHi, _ := ioutil.ReadFile(filenameHi)
+
+	endBlockLo := startBlockLo + uint64(len(keyBlockLo)-1)
+	endBlockHi := startBlockHi + uint64(len(keyBlockHi)-1)
+
+	headerLo := newKeyBlockHeader(keyBlockLo)
+	headerHi := newKeyBlockHeader(keyBlockHi)
+
+	fmt.Println(headerLo.Entries())
+	fmt.Println(headerHi.Entries())
+
+	sortedPointersLo := make([]byte, headerLo.Entries()*8)
+	sortedPointersHi := make([]byte, headerHi.Entries()*8)
+
+	freeBlockLo, _ := headerLo.GetFreeAddress(endBlockLo, uint64(len(keyBlockLo)))
+	freeBlockHi ,_ := headerHi.GetFreeAddress(endBlockHi, uint64(len(keyBlockHi)))
+	shift := freeBlockHi - endBlockLo
+
+	// Adjust pointers for low block
+	for p := 0; p < len(sortedPointersLo); p += 8 {
+		binary.LittleEndian.PutUint64(sortedPointersLo[p:], shift+binary.LittleEndian.Uint64(keyBlockLo[KeyBlockFixedHeaderSize+p:KeyBlockFixedHeaderSize+p+8]))
+	}
+	// Save pointers for high block
+	copy(sortedPointersHi, keyBlockHi[KeyBlockFixedHeaderSize:KeyBlockFixedHeaderSize+headerHi.Entries()*8])
+
+	// Copy keys up
+	copy(keyBlockHi, keyBlockLo[uint64(len(keyBlockLo))-shift:])
+	copy(keyBlockLo[uint64(len(keyBlockLo))-(endBlockLo-freeBlockLo)+shift:], keyBlockLo[uint64(len(keyBlockLo))-(endBlockLo-freeBlockLo):uint64(len(keyBlockLo))-shift])
+
+	// Zero out remaining keys
+	for p := freeBlockLo + 1; p < freeBlockLo+1+shift; p += 8 {
+		binary.LittleEndian.PutUint64(keyBlockLo[p&KeyBlockMask:], 0)
+	}
+
+	// TODO: combine sorted pointer lists by merge sorting them
+	// TODO: determine duplicate entries (same key)
+	duplicateEntries := uint64(0)
+	copy(keyBlockLo[KeyBlockFixedHeaderSize:], sortedPointersHi)
+	copy(keyBlockLo[KeyBlockFixedHeaderSize+len(sortedPointersHi):], sortedPointersLo)
+
+	headerLo.SetEntries(uint64(len(sortedPointersHi)+len(sortedPointersLo))/8 - duplicateEntries)
+
+	ConcatFiles(filenameLo+".merged", keyBlockLo[:], keyBlockHi[:], 0644)
+
+	os.Rename(filenameLo, filenameLo+".bak") // os.Remove(filenameLo)
+	os.Rename(filenameLo+".merged", filenameLo)
+	os.Rename(filenameHi, filenameHi+".bak") // os.Remove(filenameHi)
 
 	// b l o c k   1
 	//$ hexdump -C test-key-0xffffffffffffff00
