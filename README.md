@@ -17,6 +17,7 @@ It is meant for very large datasets. By taking full advantage of emerging NVRAM 
 - Keys are stored in an immutable append-only fashion
 - High performance and fully multi-threaded
 - Simplictly in use, minimal config (ideally none)
+- Fast restarts (esp. to accept writes again)
 
 ## Performance
 
@@ -27,23 +28,25 @@ BenchmarkPut200b-8   	 5000000	       310 ns/op	 643.47 MB/s
 
 Read from 100M keys (single thread)
 ```
-BenchmarkGet10B-8   	  200000	      5940 ns/op	   1.68 MB/s
+BenchmarkGet10B-8   	  200000	      5940 ns/op
 ```
 
-```
---- PASS: TestCreate10M (4.00s)
---- PASS: TestCreate20M (7.71s)
---- PASS: TestCreate40M (17.12s)
---- PASS: TestCreate80M (31.86s)
---- PASS: TestCreate120M (50.95s)
---- PASS: TestCreate160M (67.49s)
---- PASS: TestCreate240M (101.97s)
---- PASS: TestCreate320M (137.35s)
---- PASS: TestCreate400M (169.47s)
---- PASS: TestCreate500M (212.75s)
---- PASS: TestCreate750M (321.27s)
---- PASS: TestCreate1000M (393.07s)
-```
+Total creation time using sequential ordering (key-size=8 bytes)
+
+test case | time | IOPS (M) | key store size
+----------|----:|------:|------:|
+TestCreate10M | 4.0s | 2.50 | 0.3 GB
+TestCreate20M | 7.7s |2.59 | 0.6 GB
+TestCreate40M | 17.1s | 2.34 | 1.3 GB
+TestCreate80M | 31.9s | 2.51 | 2.6 GB
+TestCreate120M | 51.0s | 2.36 | 3.8 GB
+TestCreate160M | 67.5s | 2.37 | 5.1 GB
+TestCreate240M | 102.0s | 2.35 | 7.7 GB
+TestCreate320M | 137.4s | 2.33 | 10 GB
+TestCreate400M | 169.5s | 2.36 | 13 GB
+TestCreate500M | 212.8s | 2.35 | 16 GB
+TestCreate750M | 321.3s | 2.33 | 24 GB
+TestCreate1000M | 393.1s | 2.54 | 32 GB
 
 ## Persistent Memory
 
@@ -98,6 +101,7 @@ In order to better understand where kvbos stands, here is a comparison to redis 
 ## Miscellaenous
 
 - Use HTTP range GETs for values that are purged from memory
+- It is up to the client to compress data or not (after all, the client knows best when to do this)
 
 ## Block storage
 
@@ -199,5 +203,4 @@ Split between
 
 - Value size is limited to 32-bits
 - Key size is limited to 16-bits
-- 
 - Values larger than the Value Block size cannot be stored

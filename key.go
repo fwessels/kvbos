@@ -67,11 +67,15 @@ const KeyBlockFixedHeaderSize = 8
 
 func newKeyBlockHeader(b []byte) KeyBlockHeader { return KeyBlockHeader(b) }
 
+func (kbh KeyBlockHeader) Entries() uint64 { return uint64(binary.LittleEndian.Uint64(kbh[0:])) }
+
+func (kbh KeyBlockHeader) SetEntries(entries uint64) { binary.LittleEndian.PutUint64(kbh[0:], entries) }
+
 func (kbh KeyBlockHeader) Get(key []byte, kvb *KVBos) ([]byte, bool) {
 
 	entries := kbh.Entries()
 
-	startIndex := uint32(0)
+	startIndex := uint64(0)
 	endIndex := entries
 
 	// (Binary) search for position to add new pointer
@@ -100,15 +104,13 @@ func (kbh KeyBlockHeader) Get(key []byte, kvb *KVBos) ([]byte, bool) {
 	return []byte{}, false
 }
 
-func (kbh KeyBlockHeader) Entries() uint32 { return uint32(binary.LittleEndian.Uint32(kbh[0:])) }
-
 func (kbh KeyBlockHeader) AddSortedPointer(keyPointer uint64, kvb *KVBos) {
 
 	// TODO: Make sure sequential adds are optimized (allow fast bulk load of keys in sequential order)
 
 	entries := kbh.Entries()
 
-	startIndex := uint32(0)
+	startIndex := uint64(0)
 	endIndex := entries
 
 	// (Binary) search for position to add new pointer
@@ -136,7 +138,20 @@ func (kbh KeyBlockHeader) AddSortedPointer(keyPointer uint64, kvb *KVBos) {
 	// insert item into position
 	binary.LittleEndian.PutUint64(kbh[KeyBlockFixedHeaderSize+endIndex*8:], keyPointer)
 
-	binary.LittleEndian.PutUint32(kbh[0:], entries+1)
+	binary.LittleEndian.PutUint64(kbh[0:], entries+1)
+}
+
+func (kbh KeyBlockHeader) GetFreeAddress(keyPointer, blockSize uint64) (uint64, uint64) {
+
+	valuePointer := uint64(0)
+	entries := kbh.Entries()
+	for e := uint64(0); e < entries; e++ {
+		pItem := keyPointer - (KeyHeaderSize - 1)
+		pItemHdr := newKeyHeader(kbh[pItem&(blockSize-1):], KeyHeaderSize)
+		keyPointer -= KeyHeaderSize + uint64(pItemHdr.KeyAlignedSize())
+		valuePointer = pItemHdr.ValuePointer() + uint64(pItemHdr.ValueSize())
+	}
+	return keyPointer, valuePointer
 }
 
 func (kbh KeyBlockHeader) Verify() {
