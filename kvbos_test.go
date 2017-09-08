@@ -91,6 +91,12 @@ func TestCreate500M(t *testing.T)  { testCreate(500*million, 1) }
 func TestCreate750M(t *testing.T)  { testCreate(750*million, 1) }
 func TestCreate1000M(t *testing.T) { testCreate(1000*million, 1) }
 
+func TestLoad(t *testing.T) {
+
+	Load("test", uint64(0xfffffffffffffe00))
+	Load("get-test", uint64(0xffffffffc0000000))
+}
+
 func TestCombineKeyBlocks(t *testing.T) {
 
 	//CombineKeyBlocks("test", uint64(0xffffffffffffff00), (0xffffffffffffff80))

@@ -21,10 +21,27 @@ func (kvb *KVBos) Snapshot(db string) {
 	}
 }
 
-func Load() {
+func Load(db string, startBlock uint64) {
 	// derive KeyPointer & ValuePointer from existing blocks
 
 	// consider adding CRC to KeyStruct to detect tampering/bad stores
+
+	filename := fmt.Sprintf("%s-key-0x%016x", db, startBlock)
+
+	//var err error
+	keyBlock, _ := ioutil.ReadFile(filename)
+
+	endBlock := startBlock + uint64(len(keyBlock)-1)
+
+	fmt.Printf("endBlock: %016x\n", endBlock)
+
+	header := newKeyBlockHeader(keyBlock)
+
+	fmt.Println(header.Entries())
+
+	freeBlock, valuePointer := header.GetFreeAddress(endBlock, uint64(len(keyBlock)))
+	fmt.Printf("   freeBlock: %016x\n", freeBlock)
+	fmt.Printf("valuePointer: %016x\n", valuePointer)
 }
 
 func CombineKeyBlocks(db string, startBlockLo, startBlockHi uint64) {
@@ -124,10 +141,25 @@ func CombineKeyBlocks(db string, startBlockLo, startBlockHi uint64) {
 	//000000e0  03 00 00 00 05 00 00 00  63 61 72 2d 30 00 00 00  |........car-0...|
 	//000000f0  10 00 00 00 00 00 00 00  07 00 00 00 05 00 00 00  |................|
 	//00000100
+}
 
-	// 1) memcopy key structs from lower block up
-	// 2) adjust pointers for lower block
-	// 3) combine both sorted pointer lists by merge sorting them
+func ConcatFiles(filename string, dataLo, dataHi []byte, perm os.FileMode) error {
+	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm)
+	if err != nil {
+		return err
+	}
+	n, err := f.Write(dataLo)
+	if err == nil && n < len(dataLo) {
+		err = io.ErrShortWrite
+	}
+	n, err = f.Write(dataHi)
+	if err == nil && n < len(dataHi) {
+		err = io.ErrShortWrite
+	}
+	if err1 := f.Close(); err == nil {
+		err = err1
+	}
+	return err
 }
 
 func CombineValueBlocks() {
