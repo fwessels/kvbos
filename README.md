@@ -3,18 +3,18 @@
 
 kvbos is a **K**ey **V**alue **B**acked (by) **O**bject **S**torage.
 
-It is a Key Value store relying on storing key/value pairs in NVRAM that is backed by Object Storage.
+It is a Key Value store relying on NVRAM for storing key/value pairs that is backed by Object Storage.
 
 It is meant for very large datasets. By taking full advantage of emerging NVRAM trends, servers with up to 150 TB of total space can be created today. This will grow over the next one to two years to PB (Petabyte) scale size.
 
 ## Key ideas
 
 - Separate keys and values (store in separate objects)
+- Keys are stored in an immutable append-only fashion
 - Use persistent addresses via 64-bit addresses
 - Make snapshotting cheap and fast
-- Use same format for in-memory and object storage (meaning 'conversionless' loads & saves)
-- Do not optimize for size, eg avoid varints (object storage is cheap)
-- Keys are stored in an immutable append-only fashion
+- Use same format for in-memory and object storage (no conversions for IO)
+- Do not optimize for size, eg avoid varints
 - High performance and fully multi-threaded
 - Simplictly in use, minimal config (ideally none)
 - Fast restarts (esp. to accept writes again)
@@ -50,25 +50,75 @@ TestCreate1000M | 393.1s | 2.54 | 32 GB
 
 ## Persistent Memory
 
-Think of kvbos as creating a persistent memory space at a 64-bit address range scale.
+Think of kvbos as creating a persistent memory space at a 64-bit address range scale whereby the values are stored uopwards from the bottom of the address space and the keys are stored downwards from the top of the address space.
 
-Think of a 64-bit address space whereby the values are stored from te bottom of the address space and the keys are stored from the top of the address space.
+Keys are grouped into immutable blocks. The upper part of a block contains the keys in the original order as they were added whereby each key has a pointer to its respective value. The bottom part of a key block is a arrays of pointers to its keys that is sorted on the keys so allow for quick (binary) searching of a key.
 
-Values are grouped into immutable blocks (default 4 MB). Values are stored in increasing memory order (either aligned or not). In case there is not sufficient space in a block to store a new value, the current block will be closed and saved and a new block will be created to store the value.
+```
+    +---------------------+  0xffffffffffffffff
+    |---------------------|
+    || Keys in AOF order ||
+    ||  w prts to Values ||
+    ||                   ||
+    +---------------------+
+    |                     |
+    |                     |
+    |                     |
+    |                     |
+    |                     |
+    +---------------------+
+    || Array of Key ptrs ||
+    ||  (sorted)         ||
+    ||                   ||
+    |---------------------|
+    +---------------------+  0xffffffffffff0000
+```
 
-Keys are also grouped into immutable blocks of size 512 KB. The upper part of a block contains the keys in unsorted order whereby each key has a pointer to its respective value. The bottom part of a key block is a sorted list of pointers to its keys.
+Values are also grouped into immutable blocks and are stored in increasing memory order. In case there is not sufficient space in a block to store a new value, the current block will be closed and saved and a new block will be created to store the value.
 
-## Grouping key blocks
+```
+    +---------------------+  0x0000000000010000
+    |                     |
+    |                     |
+    |                     |
+    |                     |
+    |                     |
+    +---------------------+
+    || Values in AOF     ||
+    ||  order            ||
+    ||                   ||
+    |---------------------|
+    +---------------------+  0x0000000000000000
+```
 
-**After merging the sorted list of (pointers to) keys will typically contain entries that point to keys outside of its own block.** But this is perfectly fine as we are using persistent pointers.
+## Data structures
 
-Once we have too many blocks, it is possible to create a key block without any keys itself but just pointers, this way it is possbile to prevent too many 'hops' between key blocks in order to (binary) search for a key.
+```
+struct {
+    key          [...]byte  // 64-bit aligned based on keySize
+    unused       [...]byte  // 0 or more NULL bytes 
+    valuePointer uint64
+    valueSize    uint32
+    keySize 	 uint16
+    crc16        uint16
+}
+```
+
+```
+struct {
+    value        [...]byte
+}
+```
 
 ## Snapshotting
 
-Value blocks are stored as is on object storage. Blocks that are not yet full can also be snapshotted and will be overwritten later with an updated version of the same block containing more values.
+Blocks (whether value of key blocks) are stored as is on object storage. Blocks that are not yet full can also be snapshotted and will be overwritten later with an updated version of the same block containing more values.
 
-Key blocks
+## Merging blocks
+
+Blocks will be merged together in order to reduce the number of blocks as the number of blocks increases. Two consecutive value blocks will simply be concatenated (this process can be repeated many times).
+
+When key blocks are merged a new combined sorted list of pointers is created so that searches are still fast  within the new key block.
 
 ## Trailing out of S3
 
@@ -81,6 +131,11 @@ kvbos is designed as a server, much like redis.
 ## API Design
 
 kvbos has a simple API inferface
+- Put(key []byte, value []byte)
+- Get(key []byte) value []byte
+- Delete(key []byte)
+- IteratorNext(key []byte)
+- IteratorPrev(key []byte)
 
 ## Delete value
 
@@ -91,12 +146,20 @@ kvbos has a simple API inferface
 
 In order to better understand where kvbos stands, here is a comparison to redis and rocksDB
 
-|      | redis  | rocksDB    | kvbos
-|------|--------|------------|----------
-| type | server | embeddable | server
-| storage | RAM | disk | NVRAM |
-| max size | RAM Size | disk | NVRAM Size |
-| persistent | disk | disk | Object storage |
+|            | redis    | rocksDB    | kvbos
+|------------|----------|------------|----------
+| type       | server   | embeddable | server
+| storage    | RAM      | disk       | NVRAM |
+| max size   | RAM Size | disk       | NVRAM Size |
+| persistent | disk     | disk       | Object storage |
+
+### Bulk Load of keys in Sequential Order (1B)					
+
+|            | minutes | MB/sec | ops/sec (K) | total data size
+|------------|--------:|-------:|----------:|------------:
+| kvbos      | 8       | 1560   | 2000      |  777 GB 
+| rocksdb    | 36	   | 370    | 463       |  760 GB
+| leveldb    | 91      | 146    | 183       |  760 GB
 
 ## Miscellaenous
 
@@ -163,24 +226,6 @@ $ hexdump -C test-key-0xfffffffffffffe80
 00000060  06 00 00 00 05 00 00 00  63 61 72 2d 36 00 00 00  |........car-6...|
 00000070  40 00 00 00 00 00 00 00  08 00 00 00 05 00 00 00  |@...............|
 00000080
-```
-
-## Data structure
-
-```
-struct {
-    key          []byte
-    valuePointer uint64
-    valueSize    uint32
-    keySize 	 uint16
-    crc16        uint16
-}
-```
-
-```
-struct {
-    value  []byte
-}
 ```
 
 ## Ideas
