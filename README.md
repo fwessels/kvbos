@@ -58,7 +58,7 @@ Keys are grouped into immutable blocks. The upper part of a block contains the k
     +---------------------+  0xffffffffffffffff
     |---------------------|
     || Keys in AOF order ||
-    ||  w prts to Values ||
+    ||  w ptrs to Values ||
     ||                   ||
     +---------------------+
     |                     |
