@@ -169,27 +169,17 @@ $ hexdump -C test-key-0xfffffffffffffe80
 
 ```
 struct {
+    key          []byte
     valuePointer uint64
     valueSize    uint32
-    keySize      uint32
-    key          []byte
+    keySize 	 uint16
+    crc16        uint16
 }
 ```
 
 ```
 struct {
     value  []byte
-}
-```
-
-or
-
-```
-struct {
-    valueSize uint32
-    keySize   uint32
-    value     []byte
-    key       []byte
 }
 ```
 
