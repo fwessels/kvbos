@@ -9,6 +9,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"io/ioutil"
+	"os"
 )
 
 func TestKVBos(t *testing.T) {
@@ -162,3 +164,37 @@ func benchmarkGet(b *testing.B, valSize int64) {
 }
 
 func BenchmarkGet10B(b *testing.B) { benchmarkGet(b, 10) }
+
+func TestFileCreatePerformance(t *testing.T) {
+
+	data := make([]byte, .1*million)
+
+	for i := 1; i <= 10000; i++ {
+		ioutil.WriteFile(fmt.Sprintf("perf-test/file-%04d", i), data, 0644)
+	}
+}
+
+func AppendFile(filename string, data []byte, perm os.FileMode) error {
+	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_APPEND, perm)
+	if err != nil {
+		return err
+	}
+	n, err := f.Write(data)
+	if err == nil && n < len(data) {
+		err = io.ErrShortWrite
+	}
+	if err1 := f.Close(); err == nil {
+		err = err1
+	}
+	return err
+}
+
+func TestFileAppendPerformance(t *testing.T) {
+
+	data := make([]byte, 32)
+
+	ioutil.WriteFile(fmt.Sprintf("perf-test/file-append"), data, 0644)
+	for i := 2; i <= 10000; i++ {
+		AppendFile(fmt.Sprintf("perf-test/file-append"), data, 0644)
+	}
+}
