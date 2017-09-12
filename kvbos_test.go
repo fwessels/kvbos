@@ -15,7 +15,7 @@ import (
 
 func TestKVBos(t *testing.T) {
 
-	kvb := NewKVBos()
+	kvb := NewKVBos("test")
 
 	kvb.Put([]byte("car-00"), []byte("porsche"))
 	kvb.Put([]byte("car-01"), []byte("bmw"))
@@ -50,7 +50,7 @@ const million = 1000000
 
 func testCreate(entries uint64, valSize int64) (*KVBos, uint64) {
 
-	kvb, keyCounter := NewKVBos(), uint64(0)
+	kvb, keyCounter := NewKVBos("create"), uint64(0)
 
 	wg := sync.WaitGroup{}
 	for gr := 0; gr < 1; gr++ {
@@ -110,7 +110,7 @@ func benchmarkPut(b *testing.B, valSize int64) {
 
 	keyCounter := uint64(0)
 
-	kvbBenchmark := NewKVBos()
+	kvbBenchmark := NewKVBos("benchmark")
 
 	key := make([]byte, 8)
 

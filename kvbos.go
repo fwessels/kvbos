@@ -17,16 +17,19 @@ type KVBos struct {
 	KeyBlocks  [1000]KeyBlock
 	KeyPointer uint64
 	KeyLock    sync.Mutex
+
+	DBName	   string
 }
 
 type Value struct {
 	value []byte
 }
 
-func NewKVBos() *KVBos {
+func NewKVBos(dbname string) *KVBos {
 	return &KVBos{
-		ValuePointer: uint64(0x0000000000000010), // Skip first 0x10 bytes (prevent 'NULL' from being a valid value pointer),
-		KeyPointer:   uint64(0xffffffffffffffff)} // Start at the end of the address range
+		ValuePointer: uint64(0x0000000000000010),  // Skip first 0x10 bytes (prevent 'NULL' from being a valid value pointer),
+		KeyPointer:   uint64(0xffffffffffffffff), // Start at the end of the address range
+		DBName: dbname}
 }
 
 const (
@@ -88,7 +91,20 @@ func (kvb *KVBos) putAtomic(key []byte, value []byte) uint64 {
 	highWaterMark := kvb.KeyPointer&KeyBlockMask + 1
 	if KeyHeaderSize+kh.KeyAlignedSize()+8 > highWaterMark-lowWaterMark {
 		// Not enough space left to store this key, so advance to the next key block
+		kvb.Snapshot()
 		kvb.KeyPointer = (((kvb.KeyPointer >> KeyBlockShift) - 1) << KeyBlockShift) + KeyBlockMask
+
+		mergeSize := uint64(1<<(KeyBlockShift+1))
+		kp := kvb.KeyPointer + 1
+		for kp+(mergeSize>>1) != 0x0000000000000000 { // Until there are blocks to be merged
+
+			if (kp + mergeSize) & (mergeSize-1) != 0x0 {
+				break // Break out when upper half does not match size of lower half
+			}
+			CombineKeyBlocks("test", kp, kp + (mergeSize>>1))
+
+			mergeSize *= 2
+		}
 	}
 
 	// Copy key header first (has a deterministic size,

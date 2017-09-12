@@ -8,16 +8,23 @@ import (
 	"os"
 )
 
-func (kvb *KVBos) Snapshot(db string) {
-	// TODO: Prevent resaving same block
-	for i := uint64(0x0000000000000000); i>>ValueBlockShift <= kvb.ValuePointer>>ValueBlockShift; i += ValueBlockSize {
-		filename := fmt.Sprintf("%s-val-0x%016x", db, i)
-		ioutil.WriteFile(filename, kvb.ValueBlocks[i>>ValueBlockShift][:], 0644)
+func (kvb *KVBos) Snapshot() {
+
+	// TODO: Reenable saving value blocks
+	//for i := uint64(0x0000000000000000); i>>ValueBlockShift <= kvb.ValuePointer>>ValueBlockShift; i += ValueBlockSize {
+	//	filename := fmt.Sprintf("%s-val-0x%016x", kvb.DBName, i)
+	//	ioutil.WriteFile(filename, kvb.ValueBlocks[i>>ValueBlockShift][:], 0644)
+	//}
+
+	for i := uint64((kvb.KeyPointer>>KeyBlockShift)<<KeyBlockShift); i <= uint64(0xffffffffffffffff); i += KeyBlockSize {
+	/*for i := uint64(0xffffffffffffffff) - KeyBlockMask; i>>KeyBlockShift >= kvb.KeyPointer>>KeyBlockShift; i -= KeyBlockSize {*/
+		filename := fmt.Sprintf("%s-key-0x%016x", kvb.DBName, i)
+		ioutil.WriteFile(filename, kvb.KeyBlocks[kvb.getKeyBlockIndex(i)][:], 0644)
+		break // just store single block
 	}
+}
 
 	for i := uint64(0xffffffffffffffff) - KeyBlockMask; i>>KeyBlockShift >= kvb.KeyPointer>>KeyBlockShift; i -= KeyBlockSize {
-		filename := fmt.Sprintf("%s-key-0x%016x", db, i)
-		ioutil.WriteFile(filename, kvb.KeyBlocks[kvb.getKeyBlockIndex(i)][:], 0644)
 	}
 }
 
@@ -81,8 +88,9 @@ func CombineKeyBlocks(db string, startBlockLo, startBlockHi uint64) {
 	copy(keyBlockLo[uint64(len(keyBlockLo))-(endBlockLo-freeBlockLo)+shift:], keyBlockLo[uint64(len(keyBlockLo))-(endBlockLo-freeBlockLo):uint64(len(keyBlockLo))-shift])
 
 	// Zero out remaining keys
+	mask := uint64(len(keyBlockLo)-1)
 	for p := freeBlockLo + 1; p < freeBlockLo+1+shift; p += 8 {
-		binary.LittleEndian.PutUint64(keyBlockLo[p&KeyBlockMask:], 0)
+		binary.LittleEndian.PutUint64(keyBlockLo[p&mask:], 0x0)
 	}
 
 	// TODO: combine sorted pointer lists by merge sorting them
@@ -95,9 +103,9 @@ func CombineKeyBlocks(db string, startBlockLo, startBlockHi uint64) {
 
 	ConcatFiles(filenameLo+".merged", keyBlockLo[:], keyBlockHi[:], 0644)
 
-	os.Rename(filenameLo, filenameLo+".bak") // os.Remove(filenameLo)
+	os.Remove(filenameLo) //, filenameLo+".bak") // os.Remove(filenameLo)
 	os.Rename(filenameLo+".merged", filenameLo)
-	os.Rename(filenameHi, filenameHi+".bak") // os.Remove(filenameHi)
+	os.Remove(filenameHi) //, filenameHi+".bak") // os.Remove(filenameHi)
 
 	// b l o c k   1
 	//$ hexdump -C test-key-0xffffffffffffff00
