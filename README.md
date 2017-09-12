@@ -112,7 +112,7 @@ struct {
 
 ## Snapshotting
 
-Blocks (whether value of key blocks) are stored as is on object storage. Blocks that are not yet full can also be snapshotted and will be overwritten later with an updated version of the same block containing more values.
+Blocks (whether value or key blocks) are stored as is on object storage. Blocks that are not yet full can also be snapshotted and will be overwritten later with an updated version of the same block containing more values.
 
 ## Merging blocks
 
