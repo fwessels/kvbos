@@ -5,12 +5,12 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"io/ioutil"
 	mr "math/rand"
+	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
-	"io/ioutil"
-	"os"
 )
 
 func TestKVBos(t *testing.T) {
@@ -43,7 +43,7 @@ func TestKVBos(t *testing.T) {
 	fmt.Println(string(kvb.Get([]byte("car-08"))))
 	fmt.Println(string(kvb.Get([]byte("car-12"))))
 
-	kvb.Snapshot("test")
+	kvb.Snapshot()
 }
 
 const million = 1000000

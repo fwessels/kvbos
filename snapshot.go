@@ -16,8 +16,8 @@ func (kvb *KVBos) Snapshot() {
 	//	ioutil.WriteFile(filename, kvb.ValueBlocks[i>>ValueBlockShift][:], 0644)
 	//}
 
-	for i := uint64((kvb.KeyPointer>>KeyBlockShift)<<KeyBlockShift); i <= uint64(0xffffffffffffffff); i += KeyBlockSize {
-	/*for i := uint64(0xffffffffffffffff) - KeyBlockMask; i>>KeyBlockShift >= kvb.KeyPointer>>KeyBlockShift; i -= KeyBlockSize {*/
+	// TODO: Remove for loop
+	for i := uint64((kvb.KeyPointer >> KeyBlockShift) << KeyBlockShift); i <= uint64(0xffffffffffffffff); i += KeyBlockSize {
 		filename := fmt.Sprintf("%s-key-0x%016x", kvb.DBName, i)
 		ioutil.WriteFile(filename, kvb.KeyBlocks[kvb.getKeyBlockIndex(i)][:], 0644)
 		break // just store single block
@@ -28,7 +28,7 @@ func (kvb *KVBos) Snapshot() {
 	}
 }
 
-func Load(db string, startBlock uint64) {
+func LoadBlock(db string, startBlock uint64, findFreeAddr bool) (entries, endBlock uint64, keyBlock []byte) {
 	// derive KeyPointer & ValuePointer from existing blocks
 
 	// consider adding CRC to KeyStruct to detect tampering/bad stores
@@ -36,19 +36,26 @@ func Load(db string, startBlock uint64) {
 	filename := fmt.Sprintf("%s-key-0x%016x", db, startBlock)
 
 	//var err error
-	keyBlock, _ := ioutil.ReadFile(filename)
+	keyBlock, _ = ioutil.ReadFile(filename)
 
-	endBlock := startBlock + uint64(len(keyBlock)-1)
+	endBlock = startBlock + uint64(len(keyBlock)-1)
 
 	fmt.Printf("endBlock: %016x\n", endBlock)
 
-	header := newKeyBlockHeader(keyBlock)
+	if findFreeAddr {
+		header := newKeyBlockHeader(keyBlock)
+		entries = header.Entries()
+		fmt.Println(entries)
 
-	fmt.Println(header.Entries())
+		freeBlock, valuePointer := header.GetFreeAddress(endBlock, uint64(len(keyBlock)))
+		fmt.Printf("   freeBlock: %016x\n", freeBlock)
+		fmt.Printf("valuePointer: %016x\n", valuePointer)
+	} else {
+		header := newKeyBlockHeader(keyBlock[:8])
+		entries = header.Entries()
+	}
 
-	freeBlock, valuePointer := header.GetFreeAddress(endBlock, uint64(len(keyBlock)))
-	fmt.Printf("   freeBlock: %016x\n", freeBlock)
-	fmt.Printf("valuePointer: %016x\n", valuePointer)
+	return
 }
 
 func CombineKeyBlocks(db string, startBlockLo, startBlockHi uint64) {
@@ -73,7 +80,7 @@ func CombineKeyBlocks(db string, startBlockLo, startBlockHi uint64) {
 	sortedPointersHi := make([]byte, headerHi.Entries()*8)
 
 	freeBlockLo, _ := headerLo.GetFreeAddress(endBlockLo, uint64(len(keyBlockLo)))
-	freeBlockHi ,_ := headerHi.GetFreeAddress(endBlockHi, uint64(len(keyBlockHi)))
+	freeBlockHi, _ := headerHi.GetFreeAddress(endBlockHi, uint64(len(keyBlockHi)))
 	shift := freeBlockHi - endBlockLo
 
 	// Adjust pointers for low block
@@ -88,7 +95,7 @@ func CombineKeyBlocks(db string, startBlockLo, startBlockHi uint64) {
 	copy(keyBlockLo[uint64(len(keyBlockLo))-(endBlockLo-freeBlockLo)+shift:], keyBlockLo[uint64(len(keyBlockLo))-(endBlockLo-freeBlockLo):uint64(len(keyBlockLo))-shift])
 
 	// Zero out remaining keys
-	mask := uint64(len(keyBlockLo)-1)
+	mask := uint64(len(keyBlockLo) - 1)
 	for p := freeBlockLo + 1; p < freeBlockLo+1+shift; p += 8 {
 		binary.LittleEndian.PutUint64(keyBlockLo[p&mask:], 0x0)
 	}

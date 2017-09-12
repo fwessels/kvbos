@@ -71,20 +71,20 @@ func (kbh KeyBlockHeader) Entries() uint64 { return uint64(binary.LittleEndian.U
 
 func (kbh KeyBlockHeader) SetEntries(entries uint64) { binary.LittleEndian.PutUint64(kbh[0:], entries) }
 
-func (kbh KeyBlockHeader) Get(key []byte, kvb *KVBos) ([]byte, bool) {
+// TODO: Get rid of kvb *KVBos
+func (kbh KeyBlockHeader) Get(key []byte, kvb *KVBos, mask uint64) ([]byte, bool) {
 
 	entries := kbh.Entries()
 
 	startIndex := uint64(0)
 	endIndex := entries
 
-	// (Binary) search for position to add new pointer
+	// (Binary) search for position of key
 	for startIndex < endIndex {
 		pItem := binary.LittleEndian.Uint64(kbh[KeyBlockFixedHeaderSize+(startIndex+endIndex)>>1*8:])
-		cmp := kvb.CompareKey(pItem, key)
+		cmp := kbh.CompareKey(pItem, key, mask)
 		if cmp == 0 { // same item
-			pItemHdr := newKeyHeader(kvb.KeyBlocks[kvb.getKeyBlockIndex(pItem)][pItem&KeyBlockMask:], KeyHeaderSize)
-
+			pItemHdr := newKeyHeader(kbh[pItem&mask:], KeyHeaderSize)
 			v := make([]byte, pItemHdr.ValueSize())
 			vp := pItemHdr.ValuePointer()
 			copy(v, kvb.ValueBlocks[vp>>ValueBlockShift][vp&ValueBlockMask:(vp&ValueBlockMask)+uint64(pItemHdr.ValueSize())])
@@ -102,6 +102,13 @@ func (kbh KeyBlockHeader) Get(key []byte, kvb *KVBos) ([]byte, bool) {
 	}
 
 	return []byte{}, false
+}
+
+func (kbh KeyBlockHeader) CompareKey(a uint64, key []byte, mask uint64) int {
+	akh := newKeyHeader(kbh[a&mask:], KeyHeaderSize)
+	pKeyDataA := (a & mask) - akh.KeyAlignedSize()
+
+	return bytes.Compare(kbh[pKeyDataA:pKeyDataA+uint64(akh.KeySize())], key)
 }
 
 func (kbh KeyBlockHeader) AddSortedPointer(keyPointer uint64, kvb *KVBos) {
@@ -168,13 +175,6 @@ func (kvb *KVBos) Compare(a, b uint64) int {
 	pKeyDataB := (b & KeyBlockMask) - bkh.KeyAlignedSize()
 
 	return bytes.Compare(kvb.KeyBlocks[kvb.getKeyBlockIndex(a)][pKeyDataA:pKeyDataA+uint64(akh.KeySize())], kvb.KeyBlocks[kvb.getKeyBlockIndex(b)][pKeyDataB:pKeyDataB+uint64(bkh.KeySize())])
-}
-
-func (kvb *KVBos) CompareKey(a uint64, key []byte) int {
-	akh := newKeyHeader(kvb.KeyBlocks[kvb.getKeyBlockIndex(a)][a&KeyBlockMask:], KeyHeaderSize)
-	pKeyDataA := (a & KeyBlockMask) - akh.KeyAlignedSize()
-
-	return bytes.Compare(kvb.KeyBlocks[kvb.getKeyBlockIndex(a)][pKeyDataA:pKeyDataA+uint64(akh.KeySize())], key)
 }
 
 //func (kbh KeyBlockHeader) ScanFromBack(key []byte) []byte {

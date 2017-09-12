@@ -18,7 +18,14 @@ type KVBos struct {
 	KeyPointer uint64
 	KeyLock    sync.Mutex
 
-	DBName	   string
+	DBName string
+
+	KeyBlocksLoaded []KeyBlockLoaded
+}
+
+type KeyBlockLoaded struct {
+	mask  uint64
+	block []byte
 }
 
 type Value struct {
@@ -27,9 +34,9 @@ type Value struct {
 
 func NewKVBos(dbname string) *KVBos {
 	return &KVBos{
-		ValuePointer: uint64(0x0000000000000010),  // Skip first 0x10 bytes (prevent 'NULL' from being a valid value pointer),
+		ValuePointer: uint64(0x0000000000000010), // Skip first 0x10 bytes (prevent 'NULL' from being a valid value pointer),
 		KeyPointer:   uint64(0xffffffffffffffff), // Start at the end of the address range
-		DBName: dbname}
+		DBName:       dbname}
 }
 
 const (
@@ -94,14 +101,14 @@ func (kvb *KVBos) putAtomic(key []byte, value []byte) uint64 {
 		kvb.Snapshot()
 		kvb.KeyPointer = (((kvb.KeyPointer >> KeyBlockShift) - 1) << KeyBlockShift) + KeyBlockMask
 
-		mergeSize := uint64(1<<(KeyBlockShift+1))
+		mergeSize := uint64(1 << (KeyBlockShift + 1))
 		kp := kvb.KeyPointer + 1
 		for kp+(mergeSize>>1) != 0x0000000000000000 { // Until there are blocks to be merged
 
-			if (kp + mergeSize) & (mergeSize-1) != 0x0 {
+			if (kp+mergeSize)&(mergeSize-1) != 0x0 {
 				break // Break out when upper half does not match size of lower half
 			}
-			CombineKeyBlocks("test", kp, kp + (mergeSize>>1))
+			CombineKeyBlocks(kvb.DBName, kp, kp+(mergeSize>>1))
 
 			mergeSize *= 2
 		}
@@ -130,11 +137,31 @@ func (kvb *KVBos) Get(key []byte) []byte {
 
 	kpReadOnly := atomic.LoadUint64(&kvb.KeyPointer)
 
-	// Search active key block with 'linear' search (sorted pointer map may be modified by writes)
+	// Search active key block first (sorted pointer map may be modified by writes)
+	// Two approaches:
+	// - obtain lock and use binary search (causing Put()s to temporarily block)
+	// - do 'linear' search
 
 	for kp := kpReadOnly >> KeyBlockShift; kp <= MaxKeyBlock; kp++ {
 		kbh := newKeyBlockHeader(kvb.KeyBlocks[kvb.getKeyBlockIndex(kp<<KeyBlockShift)][:])
-		val, found := kbh.Get(key, kvb)
+		val, found := kbh.Get(key, kvb, KeyBlockMask)
+		if found {
+			return val
+		}
+	}
+	return []byte{}
+}
+
+// GetFromLoad
+func (kvb *KVBos) GetFromLoad(key []byte) []byte {
+
+	//kpReadOnly := atomic.LoadUint64(&kvb.KeyPointer)
+
+	// Search active key block with 'linear' search (sorted pointer map may be modified by writes)
+
+	for _, kbl := range kvb.KeyBlocksLoaded {
+		kbh := newKeyBlockHeader(kbl.block)
+		val, found := kbh.Get(key, kvb, kbl.mask)
 		if found {
 			return val
 		}
