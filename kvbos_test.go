@@ -64,7 +64,7 @@ func testCreate(entries uint64, valSize int64) (*KVBos, uint64) {
 			}
 			for {
 				cntr := atomic.AddUint64(&keyCounter, 1)
-				if cntr >= entries {
+				if cntr > entries {
 					break
 				}
 
