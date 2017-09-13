@@ -16,16 +16,9 @@ func (kvb *KVBos) Snapshot() {
 	//	ioutil.WriteFile(filename, kvb.ValueBlocks[i>>ValueBlockShift][:], 0644)
 	//}
 
-	// TODO: Remove for loop
-	for i := uint64((kvb.KeyPointer >> KeyBlockShift) << KeyBlockShift); i <= uint64(0xffffffffffffffff); i += KeyBlockSize {
-		filename := fmt.Sprintf("%s-key-0x%016x", kvb.DBName, i)
-		ioutil.WriteFile(filename, kvb.KeyBlocks[kvb.getKeyBlockIndex(i)][:], 0644)
-		break // just store single block
-	}
-}
-
-	for i := uint64(0xffffffffffffffff) - KeyBlockMask; i>>KeyBlockShift >= kvb.KeyPointer>>KeyBlockShift; i -= KeyBlockSize {
-	}
+	baseAddr := uint64((kvb.KeyPointer >> KeyBlockShift) << KeyBlockShift)
+	filename := fmt.Sprintf("%s-key-0x%016x", kvb.DBName, baseAddr)
+	ioutil.WriteFile(filename, kvb.KeyBlockWarm[:], 0644)
 }
 
 func LoadBlock(db string, startBlock uint64, findFreeAddr bool) (entries, endBlock uint64, keyBlock []byte) {

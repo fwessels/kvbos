@@ -146,7 +146,6 @@ func benchmarkGet(b *testing.B, valSize int64) {
 		fmt.Println("Create test db ...")
 		kvbGets, kvbGetsEntries = testCreate(100*million, valSize)
 		fmt.Println("Done creating test db")
-		fmt.Println("  key blocks =", kvbGets.GetKeyBlocks())
 		fmt.Println("     entries =", kvbGetsEntries)
 	}
 

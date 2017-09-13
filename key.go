@@ -168,35 +168,11 @@ func (kbh KeyBlockHeader) Dump() {
 }
 
 func (kvb *KVBos) Compare(a, b uint64) int {
-	akh := newKeyHeader(kvb.KeyBlocks[kvb.getKeyBlockIndex(a)][a&KeyBlockMask:], KeyHeaderSize)
-	bkh := newKeyHeader(kvb.KeyBlocks[kvb.getKeyBlockIndex(b)][b&KeyBlockMask:], KeyHeaderSize)
+	akh := newKeyHeader(kvb.KeyBlockWarm[a&KeyBlockMask:], KeyHeaderSize)
+	bkh := newKeyHeader(kvb.KeyBlockWarm[b&KeyBlockMask:], KeyHeaderSize)
 
 	pKeyDataA := (a & KeyBlockMask) - akh.KeyAlignedSize()
 	pKeyDataB := (b & KeyBlockMask) - bkh.KeyAlignedSize()
 
-	return bytes.Compare(kvb.KeyBlocks[kvb.getKeyBlockIndex(a)][pKeyDataA:pKeyDataA+uint64(akh.KeySize())], kvb.KeyBlocks[kvb.getKeyBlockIndex(b)][pKeyDataB:pKeyDataB+uint64(bkh.KeySize())])
+	return bytes.Compare(kvb.KeyBlockWarm[pKeyDataA:pKeyDataA+uint64(akh.KeySize())], kvb.KeyBlockWarm[pKeyDataB:pKeyDataB+uint64(bkh.KeySize())])
 }
-
-//func (kbh KeyBlockHeader) ScanFromBack(key []byte) []byte {
-//
-//	keyPointer := uint64(KeyBlockSize - 1)
-//
-//	for i := 0; i < 3; i++ {
-//		pKeyHdr := keyPointer - (KeyHeaderSize - 1)
-//		kh := newKeyHeader(KeyBlocks[0][pKeyHdr:], KeyHeaderSize)
-//
-//		pKeyData := pKeyHdr - kh.KeyAlignedSize()
-//		if bytes.Compare( /*k*/ KeyBlocks[0][pKeyData:pKeyData+uint64(kh.KeySize())], key) == 0 {
-//			fmt.Println("kh-e-y   f-o-u-n-d =", string(KeyBlocks[0][pKeyData:pKeyData+uint64(kh.KeySize())]))
-//
-//			v := make([]byte, kh.ValueSize())
-//			vp := kh.ValuePointer()
-//			copy(v, ValueBlocks[vp>>ValueBlockShift][vp&ValueBlockMask:(vp&ValueBlockMask)+uint64(kh.ValueSize())])
-//			return v
-//		}
-//
-//		keyPointer -= KeyHeaderSize + uint64(kh.KeyAlignedSize())
-//	}
-//
-//	return []byte{}
-//}

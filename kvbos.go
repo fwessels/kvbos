@@ -14,13 +14,13 @@ type KVBos struct {
 	ValueBlocks  [28]ValueBlock
 	ValuePointer uint64
 
-	KeyBlocks  [1000]KeyBlock
-	KeyPointer uint64
-	KeyLock    sync.Mutex
+	KeyBlockWarm KeyBlock
+	KeyBlocksCold []KeyBlockLoaded
+	KeyPointer   uint64
+	KeyLock      sync.Mutex
 
 	DBName string
 
-	KeyBlocksLoaded []KeyBlockLoaded
 }
 
 type KeyBlockLoaded struct {
@@ -44,16 +44,13 @@ const (
 	ValueBlockMask = ValueBlockSize - 1
 	KeyBlockSize   = 1 << KeyBlockShift
 	KeyBlockMask   = KeyBlockSize - 1
-	MaxKeyBlock    = (0xffffffffffffffff >> KeyBlockShift)
 	KeyAlign       = 8
 )
 
 type ValueBlock [ValueBlockSize]byte
 type KeyBlock [KeyBlockSize]byte
 
-func (kvb *KVBos) getKeyBlockIndex(p uint64) uint64 {
-	return uint64(len(kvb.KeyBlocks)-1) - (MaxKeyBlock - (p >> KeyBlockShift))
-}
+var KeyBlockEmpty KeyBlock
 
 // Put
 func (kvb *KVBos) Put(key []byte, value []byte) {
@@ -94,7 +91,7 @@ func (kvb *KVBos) putAtomic(key []byte, value []byte) uint64 {
 	kh.SetCrc16(0x1234)
 
 	// Compute the boundaries from the beginning and end of the key block
-	lowWaterMark := uint64(KeyBlockFixedHeaderSize + newKeyBlockHeader(kvb.KeyBlocks[kvb.getKeyBlockIndex(kvb.KeyPointer)][:]).Entries()*8)
+	lowWaterMark := uint64(KeyBlockFixedHeaderSize + newKeyBlockHeader(kvb.KeyBlockWarm[:]).Entries()*8)
 	highWaterMark := kvb.KeyPointer&KeyBlockMask + 1
 	if KeyHeaderSize+kh.KeyAlignedSize()+8 > highWaterMark-lowWaterMark {
 		// Not enough space left to store this key, so advance to the next key block
@@ -112,19 +109,21 @@ func (kvb *KVBos) putAtomic(key []byte, value []byte) uint64 {
 
 			mergeSize *= 2
 		}
+		// clear block for next iteration
+		copy(kvb.KeyBlockWarm[:], KeyBlockEmpty[:])
 	}
 
 	// Copy key header first (has a deterministic size,
 	// so we can iterate manually 'downwards' in memory if need be)
-	copy(kvb.KeyBlocks[kvb.getKeyBlockIndex(kvb.KeyPointer)][(kvb.KeyPointer&KeyBlockMask)-uint64(KeyHeaderSize-1):], kh[:])
+	copy(kvb.KeyBlockWarm[(kvb.KeyPointer&KeyBlockMask)-uint64(KeyHeaderSize-1):], kh[:])
 
 	// Copy key itself
 	keyAlignedSize := kh.KeyAlignedSize()
-	copy(kvb.KeyBlocks[kvb.getKeyBlockIndex(kvb.KeyPointer)][(kvb.KeyPointer&KeyBlockMask)-uint64(KeyHeaderSize+keyAlignedSize-1):], key[:])
+	copy(kvb.KeyBlockWarm[(kvb.KeyPointer&KeyBlockMask)-uint64(KeyHeaderSize+keyAlignedSize-1):], key[:])
 
 	kvb.KeyPointer -= KeyHeaderSize + uint64(keyAlignedSize)
 
-	kbh := newKeyBlockHeader(kvb.KeyBlocks[kvb.getKeyBlockIndex(kvb.KeyPointer)][:])
+	kbh := newKeyBlockHeader(kvb.KeyBlockWarm[:])
 	kbh.AddSortedPointer(kvb.KeyPointer+1+keyAlignedSize, kvb)
 
 	kvb.KeyLock.Unlock()
@@ -135,31 +134,14 @@ func (kvb *KVBos) putAtomic(key []byte, value []byte) uint64 {
 // Get
 func (kvb *KVBos) Get(key []byte) []byte {
 
-	kpReadOnly := atomic.LoadUint64(&kvb.KeyPointer)
+	/*kpReadOnly*/ _ = atomic.LoadUint64(&kvb.KeyPointer)
 
 	// Search active key block first (sorted pointer map may be modified by writes)
 	// Two approaches:
 	// - obtain lock and use binary search (causing Put()s to temporarily block)
 	// - do 'linear' search
 
-	for kp := kpReadOnly >> KeyBlockShift; kp <= MaxKeyBlock; kp++ {
-		kbh := newKeyBlockHeader(kvb.KeyBlocks[kvb.getKeyBlockIndex(kp<<KeyBlockShift)][:])
-		val, found := kbh.Get(key, kvb, KeyBlockMask)
-		if found {
-			return val
-		}
-	}
-	return []byte{}
-}
-
-// GetFromLoad
-func (kvb *KVBos) GetFromLoad(key []byte) []byte {
-
-	//kpReadOnly := atomic.LoadUint64(&kvb.KeyPointer)
-
-	// Search active key block with 'linear' search (sorted pointer map may be modified by writes)
-
-	for _, kbl := range kvb.KeyBlocksLoaded {
+	for _, kbl := range kvb.KeyBlocksCold {
 		kbh := newKeyBlockHeader(kbl.block)
 		val, found := kbh.Get(key, kvb, kbl.mask)
 		if found {
