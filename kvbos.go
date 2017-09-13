@@ -134,12 +134,11 @@ func (kvb *KVBos) putAtomic(key []byte, value []byte) uint64 {
 // Get
 func (kvb *KVBos) Get(key []byte) []byte {
 
-	/*kpReadOnly*/ _ = atomic.LoadUint64(&kvb.KeyPointer)
-
 	// Search active key block first (sorted pointer map may be modified by writes)
-	// Two approaches:
-	// - obtain lock and use binary search (causing Put()s to temporarily block)
-	// - do 'linear' search
+	val, found := kvb.getAtomic(key)
+	if found {
+		return val
+	}
 
 	for _, kbl := range kvb.KeyBlocksCold {
 		kbh := newKeyBlockHeader(kbl.block)
@@ -149,6 +148,17 @@ func (kvb *KVBos) Get(key []byte) []byte {
 		}
 	}
 	return []byte{}
+}
+
+// getAtomic -- atomic part of Get() operation
+func (kvb *KVBos) getAtomic(key []byte) (val []byte, found bool) {
+
+	kvb.KeyLock.Lock()
+	kbh := newKeyBlockHeader(kvb.KeyBlockWarm[:])
+	val, found = kbh.Get(key, kvb, KeyBlockMask)
+	kvb.KeyLock.Unlock()
+
+	return
 }
 
 // Delete
