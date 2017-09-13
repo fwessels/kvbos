@@ -10,7 +10,7 @@ It is meant for very large datasets. By taking full advantage of emerging NVRAM 
 ## Key ideas
 
 - Separate keys and values (store in separate objects)
-- Keys are stored in an immutable append-only fashion
+- Keys and values are stored in an immutable append-only fashion
 - Use persistent addresses via 64-bit addresses
 - Make snapshotting cheap and fast
 - Use same format for in-memory and object storage (no conversions for IO)
@@ -146,20 +146,20 @@ kvbos has a simple API inferface
 
 In order to better understand where kvbos stands, here is a comparison to redis and rocksDB
 
-|            | redis    | rocksDB    | kvbos
-|------------|----------|------------|----------
-| type       | server   | embeddable | server
-| storage    | RAM      | disk       | NVRAM |
-| max size   | RAM Size | disk       | NVRAM Size |
+|            | redis    | rocksDB    | kvbos          |
+|------------|----------|------------|----------------|
+| type       | server   | embeddable | server         |
+| storage    | RAM      | disk       | NVRAM          |
+| max size   | RAM Size | disk       | NVRAM Size     |
 | persistent | disk     | disk       | Object storage |
 
 ### Bulk Load of keys in Sequential Order (1B)					
 
 |            | minutes | MB/sec | ops/sec (K) | total data size
-|------------|--------:|-------:|----------:|------------:
-| kvbos      | 8       | 1560   | 2000      |  777 GB 
-| rocksdb    | 36	   | 370    | 463       |  760 GB
-| leveldb    | 91      | 146    | 183       |  760 GB
+|------------|--------:|-------:|------------:|------------:
+| kvbos      | 8       | 1560   | 2000        |  777 GB 
+| rocksdb    | 36	   | 370    | 463         |  760 GB
+| leveldb    | 91      | 146    | 183         |  760 GB
 
 ## Miscellaenous
 
