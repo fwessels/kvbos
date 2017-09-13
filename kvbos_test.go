@@ -93,10 +93,52 @@ func TestCreate500M(t *testing.T)  { testCreate(500*million, 1) }
 func TestCreate750M(t *testing.T)  { testCreate(750*million, 1) }
 func TestCreate1000M(t *testing.T) { testCreate(1000*million, 1) }
 
-func TestLoad(t *testing.T) {
+func (kvb *KVBos) Load(startAddr uint64, dbname string) (entries uint64) {
 
-	Load("test", uint64(0xfffffffffffffe00))
-	Load("get-test", uint64(0xffffffffc0000000))
+	kvb.KeyBlocksCold = make([]KeyBlockCold, 9)
+
+	endAddr := startAddr - 1
+	for i := 0; endAddr < 0xffffffffffffffff; i++ {
+		var e uint64
+		var block []byte
+		startAddr = uint64(endAddr + 1)
+		e, endAddr, block = LoadBlock(dbname, startAddr, i == 0)
+		entries += e
+		kvb.KeyBlocksCold[i].mask = endAddr - startAddr
+		kvb.KeyBlocksCold[i].block = block
+	}
+	fmt.Println(entries)
+	return
+}
+
+var kvbLoadGets *KVBos
+var kvbLoadGetsEntries uint64
+
+func BenchmarkLoadDatabase(b *testing.B) {
+
+	if kvbLoadGets == nil {
+		//kvbLoadGets = NewKVBos("test")
+		//kvbLoadGetsEntries = kvbLoadGets.Load(uint64(0xfffffffe22000000),"test")
+		kvbLoadGets = NewKVBos("create")
+		kvbLoadGetsEntries = kvbLoadGets.Load(uint64(0xffffffffa0a00000), "create")
+	}
+
+	key := make([]byte, 8)
+
+	valSize := int64(1)
+	b.SetBytes(valSize)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		cntr := mr.Int63n(int64(kvbLoadGetsEntries))
+		binary.BigEndian.PutUint64(key[0:], uint64(cntr)) // Use big endian for sequential ordering
+		kvbLoadGets.Get(key)
+	}
+}
+
+func TestLoadBlock(t *testing.T) {
+
+	LoadBlock("test", uint64(0xfffffffffffffe00), true)
+	LoadBlock("get-test", uint64(0xffffffffc0000000), true)
 }
 
 func TestCombineKeyBlocks(t *testing.T) {
