@@ -2,7 +2,6 @@ package kvbos
 
 import (
 	"sync"
-	"sync/atomic"
 )
 
 const (
@@ -15,7 +14,7 @@ type KVBos struct {
 	ValuePointer uint64
 
 	KeyBlockWarm KeyBlock
-	KeyBlocksCold []KeyBlockLoaded
+	KeyBlocksCold []KeyBlockCold // TODO: Protect cold blocks with atomic.Value (ReadMostly)
 	KeyPointer   uint64
 	KeyLock      sync.Mutex
 
@@ -23,7 +22,7 @@ type KVBos struct {
 
 }
 
-type KeyBlockLoaded struct {
+type KeyBlockCold struct {
 	mask  uint64
 	block []byte
 }
@@ -96,19 +95,24 @@ func (kvb *KVBos) putAtomic(key []byte, value []byte) uint64 {
 	if KeyHeaderSize+kh.KeyAlignedSize()+8 > highWaterMark-lowWaterMark {
 		// Not enough space left to store this key, so advance to the next key block
 		kvb.Snapshot()
+
+		// Add block to cold blocks
+		block := make([]byte, len(kvb.KeyBlockWarm))
+		copy(block[:], kvb.KeyBlockWarm[:])
+		kvb.KeyBlocksCold = append(kvb.KeyBlocksCold, KeyBlockCold{mask: KeyBlockMask, block: block})
+
+		// Advance pointer
 		kvb.KeyPointer = (((kvb.KeyPointer >> KeyBlockShift) - 1) << KeyBlockShift) + KeyBlockMask
 
 		mergeSize := uint64(1 << (KeyBlockShift + 1))
-		kp := kvb.KeyPointer + 1
-		for kp+(mergeSize>>1) != 0x0000000000000000 { // Until there are blocks to be merged
+		for kp := kvb.KeyPointer + 1; kp+(mergeSize>>1) != 0x0000000000000000; mergeSize *= 2  { // Until there are blocks to be merged
 
 			if (kp+mergeSize)&(mergeSize-1) != 0x0 {
 				break // Break out when upper half does not match size of lower half
 			}
 			CombineKeyBlocks(kvb.DBName, kp, kp+(mergeSize>>1))
-
-			mergeSize *= 2
 		}
+
 		// clear block for next iteration
 		copy(kvb.KeyBlockWarm[:], KeyBlockEmpty[:])
 	}
@@ -142,11 +146,12 @@ func (kvb *KVBos) Get(key []byte) []byte {
 
 	for _, kbl := range kvb.KeyBlocksCold {
 		kbh := newKeyBlockHeader(kbl.block)
-		val, found := kbh.Get(key, kvb, kbl.mask)
+		val, found = kbh.Get(key, kvb, kbl.mask)
 		if found {
 			return val
 		}
 	}
+
 	return []byte{}
 }
 
