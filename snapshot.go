@@ -51,7 +51,7 @@ func LoadBlock(db string, startBlock uint64, findFreeAddr bool) (entries, endBlo
 	return
 }
 
-func CombineKeyBlocks(db string, startBlockLo, startBlockHi uint64) {
+func CombineKeyBlocks(db string, startBlockLo, startBlockHi uint64) ([]byte, []byte) {
 
 	filenameLo := fmt.Sprintf("%s-key-0x%016x", db, startBlockLo)
 	filenameHi := fmt.Sprintf("%s-key-0x%016x", db, startBlockHi)
@@ -107,6 +107,7 @@ func CombineKeyBlocks(db string, startBlockLo, startBlockHi uint64) {
 	os.Rename(filenameLo+".merged", filenameLo)
 	os.Remove(filenameHi) //, filenameHi+".bak") // os.Remove(filenameHi)
 
+	return keyBlockLo, keyBlockHi
 	// b l o c k   1
 	//$ hexdump -C test-key-0xffffffffffffff00
 	//00000000  03 00 00 00 00 00 00 00  70 ff ff ff ff ff ff ff  |........p.......|

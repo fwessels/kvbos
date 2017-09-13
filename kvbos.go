@@ -13,16 +13,16 @@ type KVBos struct {
 	ValueBlocks  [28]ValueBlock
 	ValuePointer uint64
 
-	KeyBlockWarm KeyBlock
+	KeyBlockWarm  KeyBlock
 	KeyBlocksCold []KeyBlockCold // TODO: Protect cold blocks with atomic.Value (ReadMostly)
-	KeyPointer   uint64
-	KeyLock      sync.Mutex
+	KeyPointer    uint64
+	KeyLock       sync.Mutex
 
 	DBName string
-
 }
 
 type KeyBlockCold struct {
+	addr  uint64
 	mask  uint64
 	block []byte
 }
@@ -54,7 +54,7 @@ var KeyBlockEmpty KeyBlock
 // Put
 func (kvb *KVBos) Put(key []byte, value []byte) {
 
-	valuePointer := kvb.putAtomic(key, value)
+	valuePointer := kvb.putAtomic(key, value, false)
 
 	// Copy value into value block
 	copy(kvb.ValueBlocks[valuePointer>>ValueBlockShift][valuePointer&ValueBlockMask:], value)
@@ -64,14 +64,17 @@ func (kvb *KVBos) Put(key []byte, value []byte) {
 // KeyPointer and ValuePointer are always adjusted in tandem, ie
 // the lowest (=latest) KeyPointer is associated with the highest
 // (=latest) ValuePointer
-func (kvb *KVBos) putAtomic(key []byte, value []byte) uint64 {
+func (kvb *KVBos) putAtomic(key []byte, value []byte, delete bool) uint64 {
 
 	kvb.KeyLock.Lock()
 
 	// Prepare value pointer
-	valuePointer := kvb.ValuePointer
-	valueSize := uint32(len(value))
-	keySize := uint16(len(key))
+	valuePointer := uint64(0)
+	valueSize := uint32(0)
+	if !delete {
+		valuePointer = kvb.ValuePointer
+		valueSize = uint32(len(value))
+	}
 	if valueSize >= ValueBlockSize {
 		// TODO: Could "overflow" value into a new block (provided it is smaller than uint32)
 		// and would require multiple blocks to read (or multiple HTTP Range GETs)
@@ -86,7 +89,7 @@ func (kvb *KVBos) putAtomic(key []byte, value []byte) uint64 {
 	kh := newKeyHeader(make([]byte, KeyHeaderSize), KeyHeaderSize)
 	kh.SetValuePointer(valuePointer)
 	kh.SetValueSize(valueSize)
-	kh.SetKeySize(keySize)
+	kh.SetKeySize(uint16(len(key)))
 	kh.SetCrc16(0x1234)
 
 	// Compute the boundaries from the beginning and end of the key block
@@ -99,18 +102,29 @@ func (kvb *KVBos) putAtomic(key []byte, value []byte) uint64 {
 		// Add block to cold blocks
 		block := make([]byte, len(kvb.KeyBlockWarm))
 		copy(block[:], kvb.KeyBlockWarm[:])
-		kvb.KeyBlocksCold = append(kvb.KeyBlocksCold, KeyBlockCold{mask: KeyBlockMask, block: block})
+		// TODO: consider memory mapping
+		kvb.KeyBlocksCold = append([]KeyBlockCold{KeyBlockCold{addr: ((kvb.KeyPointer >> KeyBlockShift) << KeyBlockShift), mask: KeyBlockMask, block: block}}, kvb.KeyBlocksCold...)
 
 		// Advance pointer
 		kvb.KeyPointer = (((kvb.KeyPointer >> KeyBlockShift) - 1) << KeyBlockShift) + KeyBlockMask
 
 		mergeSize := uint64(1 << (KeyBlockShift + 1))
-		for kp := kvb.KeyPointer + 1; kp+(mergeSize>>1) != 0x0000000000000000; mergeSize *= 2  { // Until there are blocks to be merged
+		for kp := kvb.KeyPointer + 1; kp+(mergeSize>>1) != 0x0000000000000000; mergeSize *= 2 { // Until there are blocks to be merged
 
 			if (kp+mergeSize)&(mergeSize-1) != 0x0 {
 				break // Break out when upper half does not match size of lower half
 			}
-			CombineKeyBlocks(kvb.DBName, kp, kp+(mergeSize>>1))
+			lo, hi := CombineKeyBlocks(kvb.DBName, kp, kp+(mergeSize>>1))
+			for i, cld := range kvb.KeyBlocksCold {
+				if cld.addr == kp {
+					kvb.KeyBlocksCold[i].mask = (kvb.KeyBlocksCold[i].mask << 1) + 1
+					// TODO: consider memory mapping
+					kvb.KeyBlocksCold[i].block = append(lo, hi...)
+				} else if cld.addr == kp+(mergeSize>>1) {
+					kvb.KeyBlocksCold = append(kvb.KeyBlocksCold[0:i], kvb.KeyBlocksCold[i+1:]...)
+					break
+				}
+			}
 		}
 
 		// clear block for next iteration
@@ -155,7 +169,8 @@ func (kvb *KVBos) Get(key []byte) []byte {
 	return []byte{}
 }
 
-// getAtomic -- atomic part of Get() operation
+// getAtomic -- atomic part of Get() operation in warm block
+// (needs lock since otherwise parallel Put()s may modify the map)
 func (kvb *KVBos) getAtomic(key []byte) (val []byte, found bool) {
 
 	kvb.KeyLock.Lock()
